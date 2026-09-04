@@ -1,4 +1,20 @@
-BccUtils = exports["bcc-utils"].initiate()
+if Config and Config.devMode then
+    function devPrint(...)
+        local args = { ... }
+        for i = 1, #args do
+            if type(args[i]) == "table" then
+                args[i] = json.encode(args[i])
+            elseif args[i] == nil then
+                args[i] = "nil"
+            else
+                args[i] = tostring(args[i])
+            end
+        end
+        print("^1[DEV MODE] ^4" .. table.concat(args, " ") .. "^0")
+    end
+else
+    function devPrint(...) end
+end
 
 function LoadModel(model)
   RequestModel(model)
@@ -20,29 +36,18 @@ function Notify(message, typeOrDuration, maybeDuration)
         notifyDuration = typeOrDuration
     end
 
-    if Config.Notify == "feather-menu" then
-        FeatherMenu:Notify({
-            message = message,
-            type = notifyType,
-            autoClose = notifyDuration,
-            position = "top-center",
-            transition = "slide",
-            icon = true,
-            hideProgressBar = false,
-            rtl = false,
-            style = {},
-            toastStyle = {},
-            progressStyle = {}
-        })
-    elseif Config.Notify == "vorp_core" then
-        -- Only message and duration supported
-        Notify(message, notifyDuration)
-    else
-        devPrint("[Notify] Invalid Config.Notify:", tostring(Config.Notify))
+    local result = exports['feather-notify']:ShowNotification({
+        style = notifyType == 'error' and 'warning' or 'right',
+        message = tostring(message),
+        duration = notifyDuration
+    })
+    if type(result) ~= 'table' or result.ok ~= true then
+        devPrint('[Notify] Feather Notify failed:',
+            tostring(type(result) == 'table' and result.code or 'invalid_result'))
     end
 end
 
-BccUtils.RPC:Register("feather-banks:NotifyClient", function(data)
+exports['feather-core']:RegisterRPC("feather-banks:NotifyClient", function(data)
     Notify(data.message, data.type, data.duration)
 end)
 
@@ -72,22 +77,4 @@ function IdsEqual(left, right)
     local b = NormalizeId(right)
     if not a or not b then return false end
     return a == b
-end
-
-if Config.devMode then
-    function devPrint(...)
-        local args = { ... }
-        for i = 1, #args do
-            if type(args[i]) == "table" then
-                args[i] = json.encode(args[i])
-            elseif args[i] == nil then
-                args[i] = "nil"
-            else
-                args[i] = tostring(args[i])
-            end
-        end
-        print("^1[DEV MODE] ^4" .. table.concat(args, " ") .. "^0")
-    end
-else
-    function devPrint(...) end
 end

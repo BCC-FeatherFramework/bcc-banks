@@ -4,9 +4,6 @@
 local lockpickCfg = Config.LockPicking or { Enabled = false }
 if not lockpickCfg.Enabled then return end
 
--- BccUtils initialized in client/helpers/main.lua. Some bcc-utils builds expose
--- Prompt, older examples used Prompts.
-local Prompts = BccUtils and (BccUtils.Prompts or BccUtils.Prompt)
 local bypassAccessCache = {
   checkedAt = 0,
   allowed = false,
@@ -97,7 +94,7 @@ local function hasDoorBypassAccess()
   if not bypassAccessCache.refreshing then
     bypassAccessCache.refreshing = true
     CreateThread(function()
-      local ok, allowed = BccUtils.RPC:CallAsync('Feather:Banks:CheckAdmin', {})
+      local ok, allowed = exports['feather-core']:CallRPCAsync('Feather:Banks:CheckAdmin', {})
       bypassAccessCache.checkedAt = GetGameTimer()
       bypassAccessCache.allowed = ok and allowed == true
       bypassAccessCache.refreshing = false
@@ -172,16 +169,25 @@ RegisterNetEvent('feather-banks:lockpick:setDoorState', function(doorHash, state
 end)
 
 CreateThread(function()
-  if not Prompts then return end
-
   hasDoorBypassAccess()
 
-  local openGroup = Prompts:SetupPromptGroup()
-  local openPrompt = openGroup:RegisterPrompt(textOrFallback('door_open_prompt', 'Open Door'), lockpickCfg.PromptKey or 0xCEFD9220, 1, 1, true, 'hold', { timedeventhash = 'MEDIUM_TIMED_EVENT' })
-  local lockpickGroup = Prompts:SetupPromptGroup()
-  local lockpickPrompt = lockpickGroup:RegisterPrompt(_U('lockpick_door_prompt'), lockpickCfg.PromptKey or 0xCEFD9220, 1, 1, true, 'hold', { timedeventhash = 'MEDIUM_TIMED_EVENT' })
-  local lockGroup = Prompts:SetupPromptGroup()
-  local lockPrompt = lockGroup:RegisterPrompt(textOrFallback('door_lock_prompt', 'Lock Door'), lockpickCfg.LockPromptKey or lockpickCfg.PromptKey or 0xCEFD9220, 1, 1, true, 'hold', { timedeventhash = 'MEDIUM_TIMED_EVENT' })
+  local openGroup = GetRandomIntInRange(1, 0xffffff)
+  local lockpickGroup = GetRandomIntInRange(1, 0xffffff)
+  local lockGroup = GetRandomIntInRange(1, 0xffffff)
+  local function createDoorPrompt(label, control, groupId)
+    local result = exports['feather-toolkit']:CreatePrompt({ label = label, control = control,
+      groupId = groupId, enabled = true, visible = true, pulsing = true,
+      mode = 'hold', holdMode = 'MEDIUM_TIMED_EVENT' })
+    if type(result) ~= 'table' or result.ok ~= true then
+      error(('[bcc-banks] door prompt creation failed: %s'):format(
+        tostring(type(result) == 'table' and result.code or 'invalid_result')))
+    end
+    return result.value.id
+  end
+  local promptKey = lockpickCfg.PromptKey or 0xCEFD9220
+  local openPrompt = createDoorPrompt(textOrFallback('door_open_prompt', 'Open Door'), promptKey, openGroup)
+  local lockpickPrompt = createDoorPrompt(_U('lockpick_door_prompt'), promptKey, lockpickGroup)
+  local lockPrompt = createDoorPrompt(textOrFallback('door_lock_prompt', 'Lock Door'), lockpickCfg.LockPromptKey or promptKey, lockGroup)
 
   while true do
     Wait(5)
@@ -200,20 +206,23 @@ CreateThread(function()
             local hasAccess = hasDoorBypassAccess()
             shown = true
             if hasAccess then
-              openGroup:ShowGroup(textOrFallback('door_prompt_group', 'Door'))
+              exports['feather-toolkit']:ShowPromptGroup(openGroup, textOrFallback('door_prompt_group', 'Door'))
             else
-              lockpickGroup:ShowGroup(textOrFallback('door_prompt_group', 'Door'))
+              exports['feather-toolkit']:ShowPromptGroup(lockpickGroup, textOrFallback('door_prompt_group', 'Door'))
             end
-            if hasAccess and openPrompt:HasCompleted() then
+            local openState = hasAccess and exports['feather-toolkit']:IsPromptCompleted(openPrompt) or nil
+            local lockpickState = not hasAccess and exports['feather-toolkit']:IsPromptCompleted(lockpickPrompt) or nil
+            if openState and openState.ok and openState.value.completed then
               setDoorStateBypass(doorHash, 0)
-            elseif not hasAccess and lockpickPrompt:HasCompleted() then
+            elseif lockpickState and lockpickState.ok and lockpickState.value.completed then
               tryLockpickDoor(doorHash)
             end
             break -- avoid overlapping prompts
           elseif hasDoorBypassAccess() then
             shown = true
-            lockGroup:ShowGroup(textOrFallback('door_prompt_group', 'Door'))
-            if lockPrompt:HasCompleted() then
+            exports['feather-toolkit']:ShowPromptGroup(lockGroup, textOrFallback('door_prompt_group', 'Door'))
+            local lockState = exports['feather-toolkit']:IsPromptCompleted(lockPrompt)
+            if lockState and lockState.ok and lockState.value.completed then
               setDoorStateBypass(doorHash, 1)
             end
             break -- avoid overlapping prompts

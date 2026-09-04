@@ -1,28 +1,14 @@
 Config = {
-	devMode            = false,
+	devMode            = true,
 	defaultlang        = 'en_lang',
-	Notify             = "feather-menu", ----or use feather-core
+	Notify             = "feather-notify", -- Feather port notification provider
 	UseBankerBusy      = true,        -- If enabled only 1 person can use the bank at a time
-	WebhookLink        = '',
-	WebhookTitle       = 'BCC-Banks',
-	WebhookAvatar      = '',
 
-    -- Admin configuration: choose how admin is determined
+    -- Bank administration is authorized server-side by feather-roles.
     Admin = {
-        allowConsole  = true,                 -- allow console (src=0)
-        useAce        = false,                -- check ACE permission below
-        acePermission = 'feather.banks.admin',-- ACE permission name
-        command       = 'bankadmin',          -- admin command name
-        groups        = { 'admin', 'superadmin' }, -- VORP group names
-        jobs          = { 'banker' }               -- VORP job names
-    },
-
-    adminGroups        = { 
-		'admin', 'superadmin'
-    },
-
-    AllowedJobs        = {
-		'banker'
+        allowConsole = true,
+        command = 'bankadmin',
+        roles = { 'admin', 'owner' }
     },
 
 	-- https://github.com/femga/rdr3_discoveries/blob/master/Controls/README.md
@@ -128,7 +114,7 @@ Config = {
 
 	-- Mail System
 	Mail = {
-		Script      = 'bcc-mailbox', -- 'bcc-mailbox', 'syn_mail', or 'custom'
+		Script      = 'bcc-mailbox', -- 'bcc-mailbox' or 'custom'
 		CustomEvent = '',         -- only used when Script = 'custom'
 	},
 
@@ -235,7 +221,7 @@ Config = {
 		RelockSeconds = 0,          -- Optional: re-lock after N seconds (0 = never)
 		NotifyOnMissing = true,     -- Notify if lockpick resource is missing
 		RequireItem = false,        -- If true, checks for item before minigame
-		ItemName = 'lockpick',      -- Item to check in vorp_inventory
+		ItemName = 'lockpick',      -- Item to check in feather-inventory
 
 		-- Durability handling like mms-robbery
 		Durability = {

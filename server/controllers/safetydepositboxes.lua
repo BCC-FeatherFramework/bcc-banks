@@ -9,7 +9,7 @@ end
 function IsSDBOwner(sdbId, character)
     local row = MySQL.query.await('SELECT `owner_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1;', { sdbId })[1]
     if not row then return false end
-    return tonumber(row.owner_id) == tonumber(character)
+    return IdsEqual(row.owner_id, character)
 end
 
 function IsSDBAdmin(sdbId, character)
@@ -97,7 +97,7 @@ function CreateSDB(name, ownerId, bankId, sizeKey)
     end
 
     -- insert -> id
-    local boxId = BccUtils.UUID()
+    local boxId = MySQL.scalar.await('SELECT UUID()')
     local inserted = MySQL.query.await(
         'INSERT INTO `bcc_safety_deposit_boxes` (`id`, `name`, `bank_id`, `owner_id`, `size`) VALUES (?,?,?,?,?)',
         { boxId, name, bankId, ownerId, resolvedKey }
@@ -141,7 +141,7 @@ end
 function IsSDBOwner(sdbId, character)
     local row = MySQL.query.await('SELECT `owner_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1;', { sdbId })[1]
     if not row then return false end
-    return tonumber(row.owner_id) == tonumber(character)
+    return IdsEqual(row.owner_id, character)
 end
 
 function IsSDBAdmin(sdbId, character)

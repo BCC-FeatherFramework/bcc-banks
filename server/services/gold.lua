@@ -16,7 +16,7 @@ local function roundTo(value, decimals)
     return math.floor((value * power) + 0.5) / power
 end
 
-BccUtils.RPC:Register('Feather:Banks:GetGoldRates', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetGoldRates', function(params, cb, src)
     if not canUseGoldExchange(src) then cb(false) return end
     local buy, sell = getRates()
     cb(true, { buy = buy, sell = sell })
@@ -25,7 +25,7 @@ end)
 -- params: { gold = number } OR { cash = number }
 -- If gold provided: buy that much gold.
 -- If cash provided: convert all cash to gold at buy rate.
-BccUtils.RPC:Register('Feather:Banks:BuyGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:BuyGold', function(params, cb, src)
     devPrint('BuyGold RPC called. src=', src, 'params=', params)
 
     if not canUseGoldExchange(src) then
@@ -34,14 +34,14 @@ BccUtils.RPC:Register('Feather:Banks:BuyGold', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint('BuyGold: invalid player/char')
         NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint('BuyGold: invalid player/char')
         NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
@@ -87,10 +87,10 @@ BccUtils.RPC:Register('Feather:Banks:BuyGold', function(params, cb, src)
         cb(false)
         return
     end
-    local removed = pcall(function() char.removeCurrency(0, cost) end)
-    local credited = removed and pcall(function() char.addCurrency(1, gold) end)
+    local removed = pcall(function() char.DebitWallet(0, cost) end)
+    local credited = removed and pcall(function() char.CreditWallet(1, gold) end)
     if not credited then
-        if removed then pcall(function() char.addCurrency(0, cost) end) end
+        if removed then pcall(function() char.CreditWallet(0, cost) end) end
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -104,8 +104,8 @@ BccUtils.RPC:Register('Feather:Banks:BuyGold', function(params, cb, src)
         '**Rate:** `$' .. tostring(buyRate) .. ' / gold`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Gold Exchange Purchase', lines, 15844367)
-    AddCharacterTransaction(char.charIdentifier, cost, 'gold exchange - buy', 'Bought ' .. tostring(gold) .. ' gold for $' .. tostring(cost))
+    QueueBankAuditLog('Gold Exchange Purchase', lines, 15844367)
+    AddCharacterTransaction(char.characterId, cost, 'gold exchange - buy', 'Bought ' .. tostring(gold) .. ' gold for $' .. tostring(cost))
     NotifyClient(src, _U('success_purchased_gold_for_cash', tostring(gold), tostring(cost)), 'success', 4000)
     cb(true, { gold = gold, cost = cost })
 end)
@@ -113,7 +113,7 @@ end)
 -- params: { gold = number } OR { cash = number }
 -- If gold provided: sell that much gold.
 -- If cash provided: sell enough gold to receive that much cash.
-BccUtils.RPC:Register('Feather:Banks:SellGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:SellGold', function(params, cb, src)
     devPrint('SellGold RPC called. src=', src, 'params=', params)
 
     if not canUseGoldExchange(src) then
@@ -122,14 +122,14 @@ BccUtils.RPC:Register('Feather:Banks:SellGold', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint('SellGold: invalid player/char')
         NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint('SellGold: invalid player/char')
         NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
@@ -175,10 +175,10 @@ BccUtils.RPC:Register('Feather:Banks:SellGold', function(params, cb, src)
         cb(false)
         return
     end
-    local removed = pcall(function() char.removeCurrency(1, gold) end)
-    local credited = removed and pcall(function() char.addCurrency(0, proceeds) end)
+    local removed = pcall(function() char.DebitWallet(1, gold) end)
+    local credited = removed and pcall(function() char.CreditWallet(0, proceeds) end)
     if not credited then
-        if removed then pcall(function() char.addCurrency(1, gold) end) end
+        if removed then pcall(function() char.CreditWallet(1, gold) end) end
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -192,15 +192,15 @@ BccUtils.RPC:Register('Feather:Banks:SellGold', function(params, cb, src)
         '**Rate:** `$' .. tostring(sellRate) .. ' / gold`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Gold Exchange Sale', lines, 15105570)
-    AddCharacterTransaction(char.charIdentifier, proceeds, 'gold exchange - sell', 'Sold ' .. tostring(gold) .. ' gold for $' .. tostring(proceeds))
+    QueueBankAuditLog('Gold Exchange Sale', lines, 15105570)
+    AddCharacterTransaction(char.characterId, proceeds, 'gold exchange - sell', 'Sold ' .. tostring(gold) .. ' gold for $' .. tostring(proceeds))
     NotifyClient(src, _U('success_sold_gold_for_cash', tostring(gold), tostring(proceeds)), 'success', 4000)
     cb(true, { gold = gold, cash = proceeds })
 end)
 
 -- Exchange inventory gold bar items into gold currency
 -- params: { count = number }
-BccUtils.RPC:Register('Feather:Banks:ExchangeGoldBars', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:ExchangeGoldBars', function(params, cb, src)
     devPrint('ExchangeGoldBars RPC called. src=', src, 'params=', params)
 
     if not canUseGoldExchange(src) then
@@ -209,14 +209,14 @@ BccUtils.RPC:Register('Feather:Banks:ExchangeGoldBars', function(params, cb, src
         return
     end
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint('ExchangeGoldBars: invalid user/char')
         NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
 
     local count = tonumber(params and params.count) or 0
     if not IsFinitePositiveNumber(count) or count % 1 ~= 0 then
@@ -229,8 +229,9 @@ BccUtils.RPC:Register('Feather:Banks:ExchangeGoldBars', function(params, cb, src
     local perBarGold = (Config.GoldExchange and Config.GoldExchange.GoldBarToGold) or 1.0
     local feePercent = (Config.GoldExchange and Config.GoldExchange.GoldBarFeePercent) or 0
 
-    local Inv = exports.vorp_inventory:vorp_inventoryApi()
-    local had = Inv.getItemCount(src, itemName, nil) or 0
+    local inventory = exports['feather-inventory'].initiate()
+    local countResult = inventory.Items.GetItemCount(itemName, src)
+    local had = type(countResult) == 'table' and countResult.ok == true and tonumber(countResult.value) or 0
     if had < count then
         NotifyClient(src, _U('error_not_enough_goldbars'), 'error', 4000)
         cb(false)
@@ -242,8 +243,8 @@ BccUtils.RPC:Register('Feather:Banks:ExchangeGoldBars', function(params, cb, src
         cb(false)
         return
     end
-    local removed = pcall(function() Inv.subItem(src, itemName, count) end)
-    if not removed then
+    local removed = inventory.Items.RemoveItemByName(itemName, count, src)
+    if type(removed) ~= 'table' or removed.ok ~= true then
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -251,9 +252,9 @@ BccUtils.RPC:Register('Feather:Banks:ExchangeGoldBars', function(params, cb, src
     local grossGold = perBarGold * count
     local netGold = roundTo(grossGold * (1 - (feePercent / 100)), 2)
     if netGold < 0 then netGold = 0 end
-    local credited = pcall(function() char.addCurrency(1, netGold) end)
+    local credited = pcall(function() char.CreditWallet(1, netGold) end)
     if not credited then
-        pcall(function() Inv.addItem(src, itemName, count) end)
+        inventory.Items.AddItem(itemName, count, nil, src)
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -287,7 +288,7 @@ BccUtils.RPC:Register('Feather:Banks:ExchangeGoldBars', function(params, cb, src
         '**Fee Percent:** `' .. tostring(feePercent) .. '%`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Gold Bar Exchange', lines, 15844367)
-    AddCharacterTransaction(char.charIdentifier, netGold, 'gold exchange - bars', 'Exchanged ' .. tostring(count) .. ' ' .. tostring(itemName) .. ' for ' .. tostring(toFixed(netGold, 2)) .. ' gold')
+    QueueBankAuditLog('Gold Bar Exchange', lines, 15844367)
+    AddCharacterTransaction(char.characterId, netGold, 'gold exchange - bars', 'Exchanged ' .. tostring(count) .. ' ' .. tostring(itemName) .. ' for ' .. tostring(toFixed(netGold, 2)) .. ' gold')
     cb(true, { gold = netGold, fee = feePercent })
 end)

@@ -15,19 +15,24 @@ local function giveCheckItem(src, checkId, amount, issuerFirst, issuerLast, reci
         recipient   = recipientFirst .. ' ' .. recipientLast,
         description = ('Check for $%s — to %s %s'):format(tostring(amount), recipientFirst, recipientLast),
     }
-    exports.vorp_inventory:addItem(src, checkItemName(), 1, meta, function(result)
-        if not result then
-            devPrint('[Checks] Warning: failed to give check item to src=', src)
-        end
-    end)
+    local result = exports['feather-inventory'].initiate().Items.AddItem(checkItemName(), 1, meta, src)
+    if type(result) ~= 'table' or result.ok ~= true then
+        devPrint('[Checks] Warning: failed to give check item to src=', src)
+        return false
+    end
+    return true
 end
 
 -- Scan player inventory for all bank_check items and return list of {item_id, check_id, metadata}
 local function getCheckItemsFromInventory(src)
     local results = {}
-    exports.vorp_inventory:getUserInventoryItems(src, function(items)
-        if not items then return end
-        for _, item in pairs(items) do
+    local session = exports['feather-core']:GetSessionContext(src)
+    if type(session) ~= 'table' or session.ok ~= true then return results end
+    local inventory = exports['feather-inventory'].initiate()
+    local owned = inventory.Inventory.GetCharacterInventory(session.value.characterId)
+    local listed = owned and owned.ok == true and inventory.Inventory.GetInventoryItems(owned.value.id) or nil
+    if listed and listed.ok == true then
+        for _, item in pairs(listed.value or {}) do
             if (item.name or '') == checkItemName() then
                 -- metadata may be a JSON string
                 local meta = item.metadata
@@ -46,23 +51,24 @@ local function getCheckItemsFromInventory(src)
                 end
             end
         end
-    end)
+    end
     return results
 end
 
 -- Remove a specific check item by its instance ID
 local function removeCheckItem(src, itemId)
-    exports.vorp_inventory:subItemById(src, itemId, function(result)
-        if not result then
-            devPrint('[Checks] Warning: failed to remove check item id=', tostring(itemId))
-        end
-    end)
+    local result = exports['feather-inventory'].initiate().Items.RemoveItemById(itemId)
+    if type(result) ~= 'table' or result.ok ~= true then
+        devPrint('[Checks] Warning: failed to remove check item id=', tostring(itemId))
+        return false
+    end
+    return true
 end
 
 -- ─────────────────────────────────────────────────────────────
 --  Write a check
 -- ─────────────────────────────────────────────────────────────
-BccUtils.RPC:Register('Feather:Banks:WriteCheck', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:WriteCheck', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then
         NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
         cb(false)
@@ -80,10 +86,10 @@ BccUtils.RPC:Register('Feather:Banks:WriteCheck', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then cb(false) return end
-    local char   = user.getUsedCharacter
-    local charId = NormalizeId(char.charIdentifier)
+    local user = GetBankingContext(src)
+    if not user then cb(false) return end
+    local char   = user
+    local charId = NormalizeId(char.characterId)
 
     local access = GetAccountAccess(accountId, charId)
     if access == 0 or access > Config.AccessLevels.Withdraw_Deposit then
@@ -119,13 +125,21 @@ BccUtils.RPC:Register('Feather:Banks:WriteCheck', function(params, cb, src)
     -- Physical item mode: give check item to the issuer to hand over in RP
     if useItem() then
         local issuerFirst, issuerLast = GetCharacterName(charId)
-        giveCheckItem(
+        local itemCreated = giveCheckItem(
             src,
             result.check_id,
             amount,
             issuerFirst or '?', issuerLast or '?',
             firstName, lastName
         )
+        if not itemCreated then
+            MySQL.update.await('UPDATE `bcc_checks` SET `status` = "voided" WHERE `id` = ? AND `status` = "pending"',
+                { result.check_id })
+            DepositCash(accountId, amount)
+            NotifyClient(src, _U('error_unable_write_check'), 'error', 4000)
+            cb(false)
+            return
+        end
     end
 
     NotifyClient(src, _U('check_written_notify', tostring(amount)), 'success', 4000)
@@ -145,7 +159,7 @@ BccUtils.RPC:Register('Feather:Banks:WriteCheck', function(params, cb, src)
         lines[#lines + 1] = '**Memo:** `' .. tostring(memo:sub(1, 200)) .. '`'
     end
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Check Written', lines, 3447003)
+    QueueBankAuditLog('Bank Check Written', lines, 3447003)
     cb(true)
 end)
 
@@ -154,12 +168,12 @@ end)
 --  DB-only mode : query bcc_checks by recipient_character_id
 --  Item mode    : scan inventory, validate each check_id in DB
 -- ─────────────────────────────────────────────────────────────
-BccUtils.RPC:Register('Feather:Banks:GetMyChecks', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetMyChecks', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then cb(false, {}) return end
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then cb(false, {}) return end
-    local char   = user.getUsedCharacter
-    local charId = NormalizeId(char.charIdentifier)
+    local user = GetBankingContext(src)
+    if not user then cb(false, {}) return end
+    local char   = user
+    local charId = NormalizeId(char.characterId)
 
     if not useItem() then
         local checks = GetPendingChecksForRecipient(charId)
@@ -191,15 +205,15 @@ end)
 -- ─────────────────────────────────────────────────────────────
 --  Get pending checks issued from an account (for voiding)
 -- ─────────────────────────────────────────────────────────────
-BccUtils.RPC:Register('Feather:Banks:GetIssuedChecks', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetIssuedChecks', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then cb(false, {}) return end
     local accountId = NormalizeId(params and params.account)
     if not accountId then cb(false, {}) return end
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then cb(false, {}) return end
-    local char   = user.getUsedCharacter
-    local charId = NormalizeId(char.charIdentifier)
+    local user = GetBankingContext(src)
+    if not user then cb(false, {}) return end
+    local char   = user
+    local charId = NormalizeId(char.characterId)
 
     local access = GetAccountAccess(accountId, charId)
     if access == 0 then cb(false, {}) return end
@@ -211,7 +225,7 @@ end)
 -- ─────────────────────────────────────────────────────────────
 --  Cash a check
 -- ─────────────────────────────────────────────────────────────
-BccUtils.RPC:Register('Feather:Banks:CashCheck', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:CashCheck', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then
         NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
         cb(false)
@@ -233,10 +247,10 @@ BccUtils.RPC:Register('Feather:Banks:CashCheck', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then cb(false) return end
-    local char   = user.getUsedCharacter
-    local charId = NormalizeId(char.charIdentifier)
+    local user = GetBankingContext(src)
+    if not user then cb(false) return end
+    local char   = user
+    local charId = NormalizeId(char.characterId)
 
     -- Item mode: verify the player physically holds the check item
     local foundItemId = nil
@@ -275,7 +289,7 @@ BccUtils.RPC:Register('Feather:Banks:CashCheck', function(params, cb, src)
         return
     end
 
-    local credited = pcall(function() char.addCurrency(0, result.amount) end)
+    local credited = pcall(function() char.CreditWallet(0, result.amount) end)
     if not credited then
         MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', { checkId })
         ReleasePlayerFinancialLock(src)
@@ -303,14 +317,14 @@ BccUtils.RPC:Register('Feather:Banks:CashCheck', function(params, cb, src)
         '**Mode:** `' .. tostring(useItem() and 'item' or 'db') .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Check Cashed', lines, 3066993)
+    QueueBankAuditLog('Bank Check Cashed', lines, 3066993)
     cb(true, { amount = result.amount })
 end)
 
 -- ─────────────────────────────────────────────────────────────
 --  Void a check (issuer or account admin, refunds account)
 -- ─────────────────────────────────────────────────────────────
-BccUtils.RPC:Register('Feather:Banks:VoidCheck', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:VoidCheck', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then
         NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
         cb(false)
@@ -323,10 +337,10 @@ BccUtils.RPC:Register('Feather:Banks:VoidCheck', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then cb(false) return end
-    local char   = user.getUsedCharacter
-    local charId = NormalizeId(char.charIdentifier)
+    local user = GetBankingContext(src)
+    if not user then cb(false) return end
+    local char   = user
+    local charId = NormalizeId(char.characterId)
 
     local result = VoidCheck(checkId, charId)
 
@@ -354,7 +368,7 @@ BccUtils.RPC:Register('Feather:Banks:VoidCheck', function(params, cb, src)
         '**Recipient Char ID:** `' .. tostring(check and check.recipient_character_id or 'Unknown') .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Check Voided', lines, 15158332)
+    QueueBankAuditLog('Bank Check Voided', lines, 15158332)
     cb(true)
 end)
 
@@ -365,22 +379,11 @@ end)
 -- ─────────────────────────────────────────────────────────────
 AddEventHandler('Feather:Banks:DatabaseReady', function(checkItemReady)
 if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useItem() then
-    exports.vorp_inventory:registerUsableItem(checkItemName(), function(data)
-    local src = data.source
+    exports['feather-inventory'].initiate().Items.RegisterUsableItem(checkItemName(), function(itemObj, src, refresh)
 
     if not (Config.Checks and Config.Checks.Enabled == true) then return end
 
-    -- VORP passes the full item as a JSON string under data.item
-    local itemObj = {}
-    if type(data.item) == 'string' then
-        local ok, parsed = pcall(json.decode, data.item)
-        itemObj = (ok and type(parsed) == 'table') and parsed or {}
-    elseif type(data.item) == 'table' then
-        itemObj = data.item
-    end
-
-    -- Instance ID is mainid inside the item object
-    local itemId = itemObj.mainid or itemObj.id
+    local itemId = itemObj and itemObj.id
 
     -- Metadata is nested inside the item object, also may be a JSON string
     local meta = itemObj.metadata
@@ -404,10 +407,10 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
         return
     end
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then return end
-    local char   = user.getUsedCharacter
-    local charId = NormalizeId(char.charIdentifier)
+    local user = GetBankingContext(src)
+    if not user then return end
+    local char   = user
+    local charId = NormalizeId(char.characterId)
 
     if not AcquirePlayerFinancialLock(src) then
         NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
@@ -427,7 +430,7 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
         return
     end
 
-    local credited = pcall(function() char.addCurrency(0, result.amount) end)
+    local credited = pcall(function() char.CreditWallet(0, result.amount) end)
     if not credited then
         MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', { checkId })
         ReleasePlayerFinancialLock(src)
@@ -435,9 +438,12 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
     end
 
     -- Remove the item instance
-    exports.vorp_inventory:subItemById(src, itemId, function(removed)
-        if not removed then devPrint('[Checks] Warning: failed to remove check item id=', tostring(itemId)) end
-    end)
+    local removed = exports['feather-inventory'].initiate().Items.RemoveItemById(itemId)
+    if type(removed) ~= 'table' or removed.ok ~= true then
+        devPrint('[Checks] Warning: failed to remove check item id=', tostring(itemId))
+    elseif refresh then
+        refresh()
+    end
     ReleasePlayerFinancialLock(src)
     NotifyClient(src, _U('check_cashed_notify', tostring(result.amount)), 'success', 4000)
     local check = GetCheck(checkId)
@@ -459,7 +465,7 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
         '**Mode:** `item`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Check Cashed', lines, 3066993)
+    QueueBankAuditLog('Bank Check Cashed', lines, 3066993)
     end, GetCurrentResourceName())
 end
 end)

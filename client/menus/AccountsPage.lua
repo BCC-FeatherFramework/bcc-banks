@@ -1,5 +1,5 @@
 function OpenAccountDetails(account, AccountPage)
-    local ok, resp = BccUtils.RPC:CallAsync("Feather:Banks:GetAccount", {
+    local ok, resp = exports['feather-core']:CallRPCAsync("Feather:Banks:GetAccount", {
         account     = tostring(account.id),
         lockAccount = true
     })
@@ -201,7 +201,7 @@ function OpenTransferPage(account, ParentPage)
             Notify(_U('invalid_cash_amount'), 4000)
             return
         end
-        local ok, resp = BccUtils.RPC:CallAsync('Feather:Banks:TransferCash', {
+        local ok, resp = exports['feather-core']:CallRPCAsync('Feather:Banks:TransferCash', {
             fromAccount = account.id,
             toAccountNumber = destNumber,
             amount = amt,
@@ -242,7 +242,7 @@ function OpenTransferSelectBank(account, ParentPage)
         style = {}
     })
 
-    local ok, banks = BccUtils.RPC:CallAsync('Feather:Banks:GetBanks', {})
+    local ok, banks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
     -- Normalize return shape: some RPCs return (data) instead of (ok, data)
     if type(ok) == 'table' and banks == nil then
         banks = ok
@@ -299,7 +299,7 @@ function OpenTransferSelectAccount(account, bank, ParentPage)
     })
 
     -- List only YOUR accounts at the selected bank
-    local ok, accounts = BccUtils.RPC:CallAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
     devPrint('Transfer SelectAccount (mine-only): bank=', bank.id, 'ok=', ok, 'accounts_count=', accounts and #accounts or 0)
     if not ok or not accounts or #accounts == 0 then
         SelectAccountTransferPage:RegisterElement('textdisplay', {
@@ -382,7 +382,7 @@ function OpenTransferForm(fromAccount, toAccount, ParentPage)
             Notify(_U('invalid_cash_amount'), 4000)
             return
         end
-        local ok, resp = BccUtils.RPC:CallAsync('Feather:Banks:TransferCash', {
+        local ok, resp = exports['feather-core']:CallRPCAsync('Feather:Banks:TransferCash', {
             fromAccount = fromAccount.id,
             toAccountId = toAccount.id,
             amount = amt,
@@ -439,7 +439,7 @@ function OpenCreateAccountPage(bank, AccountPage)
             }
 
             devPrint("Sending data to server:", json.encode(data))
-            BccUtils.RPC:CallAsync('Feather:Banks:CreateAccount', data)
+            exports['feather-core']:CallRPCAsync('Feather:Banks:CreateAccount', data)
 
             OpenUI(bank)
         else
@@ -481,7 +481,7 @@ function OpenAccountsListPage(bank, ParentPage)
         style = {}
     })
 
-    local ok, accounts = BccUtils.RPC:CallAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
 
     devPrint("Accounts fetched from server:", json.encode(accounts))
 

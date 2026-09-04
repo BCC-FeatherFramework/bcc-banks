@@ -1,22 +1,13 @@
 BccBanksInternal = BccBanksInternal or {}
 
-local function getWebhookLink()
-    local webhook = Config and (Config.WebhookLink or Config.Webhook) or nil
-    if type(webhook) ~= 'string' then return nil end
-    webhook = webhook:gsub('^%s+', ''):gsub('%s+$', '')
-    if webhook == '' then return nil end
-    return webhook
-end
-
-local function discordEnabled()
-    return BccUtils and BccUtils.Discord and getWebhookLink() ~= nil
-end
-
-local function getCharacterRecord(charIdentifier)
-    local id = tonumber(charIdentifier)
+local function getCharacterRecord(characterId)
+    local id = characterId and tostring(characterId) or nil
     if not id then return nil end
-    local rows = MySQL.query.await('SELECT firstname, lastname FROM `characters` WHERE `charidentifier` = ? LIMIT 1', { id })
-    return rows and rows[1] or nil
+    local found = exports['feather-core']:GetProvider('character-profile', nil, 1)
+    local provider = found and found.ok == true and found.value and found.value.implementation or nil
+    local result = provider and provider.GetProfile and provider.GetProfile(id) or nil
+    local profile = result and result.ok == true and result.value or nil
+    return profile and { firstname = profile.firstName, lastname = profile.lastName } or nil
 end
 
 local function getPlayerLogContext(src)
@@ -28,19 +19,19 @@ local function getPlayerLogContext(src)
         lastName = '',
     }
 
-    if not VORPcore or not src then
+    if not GetBankingContext or not src then
         return ctx
     end
 
-    local user = VORPcore.getUser(src)
-    local char = user and user.getUsedCharacter or nil
+    local user = GetBankingContext(src)
+    local char = user or nil
     if not char then
         return ctx
     end
 
-    ctx.charId = tonumber(char.charIdentifier) or char.charIdentifier
-    ctx.firstName = char.firstname or ctx.firstName
-    ctx.lastName = char.lastname or ctx.lastName
+    ctx.charId = tonumber(char.characterId) or char.characterId
+    ctx.firstName = char.firstName or ctx.firstName
+    ctx.lastName = char.lastName or ctx.lastName
 
     if (ctx.firstName == 'Unknown' or ctx.firstName == nil) and ctx.charId then
         local row = getCharacterRecord(ctx.charId)
@@ -53,8 +44,8 @@ local function getPlayerLogContext(src)
     return ctx
 end
 
-local function getCharacterNameById(charIdentifier)
-    local row = getCharacterRecord(charIdentifier)
+local function getCharacterNameById(characterId)
+    local row = getCharacterRecord(characterId)
     if not row then
         return 'Unknown'
     end
@@ -98,27 +89,10 @@ local function appendActorLines(lines, src)
     lines[#lines + 1] = '**Source:** `' .. tostring(src or 'Unknown') .. '`'
 end
 
-function SendBankDiscordLog(title, lines, color)
-    if not discordEnabled() then
-        return false
-    end
-
-    local description = table.concat(lines or {}, '\n')
-    local embed = {{
-        color = color or 3447003,
-        title = title or 'BCC-Banks',
-        description = description
-    }}
-
-    BccUtils.Discord.sendMessage(
-        getWebhookLink(),
-        Config.WebhookTitle or 'BCC-Banks',
-        Config.WebhookAvatar or '',
-        title or 'BCC-Banks',
-        nil,
-        embed
-    )
-    return true
+function QueueBankAuditLog(title, lines, color)
+    -- The temporary economy owns its durable outbox. General bank event schemas
+    -- will be connected when the shared feather-audit producer contract ships.
+    return false
 end
 
 BccBanksInternal.getPlayerLogContext = getPlayerLogContext

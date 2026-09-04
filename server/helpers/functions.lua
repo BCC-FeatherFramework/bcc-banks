@@ -1,9 +1,20 @@
-function NotifyClient(src, message, type, duration)
-    BccUtils.RPC:Notify("feather-banks:NotifyClient", {
-        message = message,
-        type = type or "info",
-        duration = duration or 4000
-    }, src)
+function NotifyClient(src, message, notificationType, duration)
+    local style = notificationType == 'error' and 'warning' or 'right'
+    local request = {
+        source = tonumber(src),
+        style = style,
+        message = tostring(message),
+        duration = math.floor(tonumber(duration) or 4000)
+    }
+    if style == 'warning' then request.title = 'Banking' end
+
+    local result = exports['feather-core']:SendNotification(request)
+    if type(result) ~= 'table' or result.ok ~= true then
+        devPrint('[NotifyClient] Feather notification failed:',
+            tostring(type(result) == 'table' and result.code or 'invalid_result'),
+            tostring(type(result) == 'table' and result.message or 'No result returned'))
+    end
+    return result
 end
 
 function NormalizeId(value)

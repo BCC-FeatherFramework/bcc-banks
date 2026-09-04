@@ -83,7 +83,7 @@ function OpenWriteCheckPage(account, ParentPage)
             label = _U('confirm_button'),
             style = {}
         }, function()
-            local ok = BccUtils.RPC:CallAsync('Feather:Banks:WriteCheck', {
+            local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:WriteCheck', {
                 account    = account.id,
                 first_name = fn,
                 last_name  = ln,
@@ -134,7 +134,7 @@ function OpenIssuedChecksPage(account, ParentPage)
     })
     IssuedPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, checks = BccUtils.RPC:CallAsync('Feather:Banks:GetIssuedChecks', { account = account.id })
+    local ok, checks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetIssuedChecks', { account = account.id })
     checks = (ok and checks) or {}
 
     if #checks == 0 then
@@ -168,7 +168,7 @@ function OpenIssuedChecksPage(account, ParentPage)
                     label = _U('void_check_button'),
                     style = {}
                 }, function()
-                    BccUtils.RPC:CallAsync('Feather:Banks:VoidCheck', { check_id = check.id })
+                    exports['feather-core']:CallRPCAsync('Feather:Banks:VoidCheck', { check_id = check.id })
                     OpenIssuedChecksPage(account, ParentPage)
                 end)
                 VoidConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
@@ -213,7 +213,7 @@ function OpenCashCheckPage(bank, ParentPage)
     })
     CashPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, checks = BccUtils.RPC:CallAsync('Feather:Banks:GetMyChecks', {})
+    local ok, checks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetMyChecks', {})
     checks = (ok and checks) or {}
 
     if #checks == 0 then
@@ -247,7 +247,7 @@ function OpenCashCheckPage(bank, ParentPage)
                     label = _U('checks_button'),
                     style = {}
                 }, function()
-                    BccUtils.RPC:CallAsync('Feather:Banks:CashCheck', { check_id = check.id })
+                    exports['feather-core']:CallRPCAsync('Feather:Banks:CashCheck', { check_id = check.id })
                     OpenCashCheckPage(bank, ParentPage)
                 end)
                 ConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })

@@ -6,7 +6,7 @@
   - replaced size buttons with image-based size options
 - Added safety deposit box deletion with confirmation and inventory cleanup.
 - Added admin door open/close bypass for bank doors.
-- Added Discord webhook logging for bank activity.
+- Added durable Audit-ready activity context for bank operations.
 - Added transaction log entries for more banking actions.
 - Updated `bcc_safety_deposit_boxes.inventory_id` to `CHAR(40)` for `sdb_` UUID inventory IDs.
 <1.5.2>

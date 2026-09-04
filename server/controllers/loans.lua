@@ -22,7 +22,7 @@ function CreateLoan(account_id, character_id, amount, interest, duration, bank_i
         day = tonumber(t.day) or 0
     end
 
-    local loanId = BccUtils.UUID()
+    local loanId = MySQL.scalar.await('SELECT UUID()')
     local loanRows = MySQL.query.await(
         'INSERT INTO `bcc_loans` (id, account_id, bank_id, character_id, amount, interest, duration, status, last_game_day, game_days_elapsed, due_game_days) VALUES (?, ?, ?, ?, ?, ?, ?, \'pending\', ?, 0, ?) RETURNING *;',
         { loanId, account_id, bank_id, character_id, amount, interest or 0, months, day, due_game_days }
@@ -109,7 +109,7 @@ function RepayLoan(loan_id, account_id, character_id, amount)
         MySQL.query.await('UPDATE `bcc_loans` SET `status` = "paid", `is_defaulted` = 0 WHERE `id` = ?', { loan_id })
         local ownerChar = (after.loan and after.loan.character_id) or (info and info.loan and info.loan.character_id) or character_id
         if ownerChar then
-            SetOwnerAccountsFrozen(tonumber(ownerChar), false)
+            SetOwnerAccountsFrozen(ownerChar, false)
         end
     end
 
@@ -177,7 +177,7 @@ function ClaimLoanToAccount(loan_id, account_id, character_id)
     if loan.disbursed_account_id then
         return { status = false, message = 'Loan funds already disbursed.' }
     end
-    if tonumber(loan.character_id) ~= tonumber(character_id) then
+    if not IdsEqual(loan.character_id, character_id) then
         return { status = false, message = 'No permission.' }
     end
     local acc = GetAccount(account_id)

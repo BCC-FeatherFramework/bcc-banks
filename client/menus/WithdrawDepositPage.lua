@@ -34,13 +34,13 @@ function OpenWithdrawDepositPage(account, actionType, parentPage)
         end
 
         if actionType == "deposit" then
-            BccUtils.RPC:CallAsync("Feather:Banks:DepositCash", {
+            exports['feather-core']:CallRPCAsync("Feather:Banks:DepositCash", {
                 account     = account.id,
                 amount      = cashAmt,
                 description = _U("deposit_cash_description")
             })
         else
-            BccUtils.RPC:CallAsync("Feather:Banks:WithdrawCash", {
+            exports['feather-core']:CallRPCAsync("Feather:Banks:WithdrawCash", {
                 account     = account.id,
                 amount      = cashAmt,
                 description = _U("withdraw_cash_description")
@@ -77,13 +77,13 @@ function OpenWithdrawDepositPage(account, actionType, parentPage)
         end
 
         if actionType == "deposit" then
-            BccUtils.RPC:CallAsync("Feather:Banks:DepositGold", {
+            exports['feather-core']:CallRPCAsync("Feather:Banks:DepositGold", {
                 account     = account.id,
                 amount      = goldAmt,
                 description = _U("deposit_gold_description")
             })
         else
-            BccUtils.RPC:CallAsync("Feather:Banks:WithdrawGold", {
+            exports['feather-core']:CallRPCAsync("Feather:Banks:WithdrawGold", {
                 account     = account.id,
                 amount      = goldAmt,
                 description = _U("withdraw_gold_description")

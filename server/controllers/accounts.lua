@@ -19,6 +19,63 @@ function GetAccountCount(owner, bank)
     return tonumber(row and (row.cnt or row["COUNT(*)"])) or 0
 end
 
+local function ToUnits(amount)
+    return math.floor((tonumber(amount) or 0) * 100 + 0.5)
+end
+
+local function FromUnits(amount)
+    return (tonumber(amount) or 0) / 100
+end
+
+local function EnsureEconomyAccounts(account)
+    if not account then return nil end
+    local changed = false
+    for _, definition in ipairs({
+        { column = 'dollars_account_id', currency = 'dollars' },
+        { column = 'gold_account_id', currency = 'gold' }
+    }) do
+        if not account[definition.column] then
+            local created = BanksEconomy.CreateAccount({
+                ownerType = 'character', ownerId = tostring(account.owner_id),
+                accountType = 'bank', currency = definition.currency,
+                label = tostring(account.name), reasonCode = 'banks.account.create',
+                referenceType = 'bcc_bank_account', referenceId = tostring(account.id),
+                idempotencyKey = ('banks:account:%s:%s'):format(account.id, definition.currency)
+            })
+            if not created.ok then return nil, created end
+            account[definition.column] = created.value.accountId
+            changed = true
+        end
+    end
+    if changed then
+        MySQL.update.await([[UPDATE bcc_accounts SET dollars_account_id = ?, gold_account_id = ?
+            WHERE id = ?]], { account.dollars_account_id, account.gold_account_id, account.id })
+    end
+
+    -- Import each legacy balance once. Idempotency makes this restart-safe.
+    for _, definition in ipairs({
+        { column = 'dollars_account_id', currency = 'dollars', legacy = 'cash' },
+        { column = 'gold_account_id', currency = 'gold', legacy = 'gold' }
+    }) do
+        local units = ToUnits(account[definition.legacy])
+        if units > 0 then
+            local imported = BanksEconomy.Issue({
+                toAccountId = account[definition.column], currency = definition.currency,
+                amount = units, reasonCode = 'economy.migration.bcc_bank_balance',
+                referenceType = 'bcc_bank_account', referenceId = tostring(account.id),
+                idempotencyKey = ('banks:legacy:%s:%s'):format(account.id, definition.currency)
+            })
+            if not imported.ok then return nil, imported end
+        end
+    end
+    local dollars = BanksEconomy.GetBalance({ accountId = account.dollars_account_id })
+    local gold = BanksEconomy.GetBalance({ accountId = account.gold_account_id })
+    if not dollars.ok or not gold.ok then return nil, dollars.ok and gold or dollars end
+    account.cash = FromUnits(dollars.value.postedAmount)
+    account.gold = FromUnits(gold.value.postedAmount)
+    return account
+end
+
 function CreateAccount(name, owner, bank)
     devPrint("CreateAccount called with:", name, owner, bank)
 
@@ -58,12 +115,13 @@ function CreateAccount(name, owner, bank)
 
     local acctNum = nextUniqueAccountNumber()
 
-    local accountId = BccUtils.UUID()
+    local accountId = MySQL.scalar.await('SELECT UUID()')
     local result = MySQL.query.await(
         'INSERT INTO `bcc_accounts` (id, account_number, name, bank_id, owner_id) VALUES (?, ?, ?, ?, ?) RETURNING *;',
         { accountId, acctNum, name, bank, owner }
     )
     local account = result and result[1]
+    account = account and EnsureEconomyAccounts(account) or nil
 
     if account then
         MySQL.query.await(
@@ -109,12 +167,13 @@ function CreateAccountReturn(name, owner, bank)
 
     local acctNum = nextUniqueAccountNumber()
 
-    local accountId = BccUtils.UUID()
+    local accountId = MySQL.scalar.await('SELECT UUID()')
     local result = MySQL.query.await(
         'INSERT INTO `bcc_accounts` (id, account_number, name, bank_id, owner_id) VALUES (?, ?, ?, ?, ?) RETURNING *;',
         { accountId, acctNum, name, bank, owner }
     )
     local account = result and result[1]
+    account = account and EnsureEconomyAccounts(account) or nil
 
     if not account then
         return { status = false, message = 'Failed to create account.' }
@@ -169,14 +228,16 @@ end
 
 function GetAccount(account)
     local result = MySQL.query.await('SELECT * FROM `bcc_accounts` WHERE `id` = ?', { account })
-    return result and result[1] or nil
+    local row = result and result[1] or nil
+    return row and EnsureEconomyAccounts(row) or nil
 end
 
 -- Find account by external account_number (UUID-like)
 function GetAccountByNumber(accountNumber)
     if not accountNumber or accountNumber == '' then return nil end
     local row = MySQL.query.await('SELECT * FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', { accountNumber })
-    return row and row[1] or nil
+    local account = row and row[1] or nil
+    return account and EnsureEconomyAccounts(account) or nil
 end
 
 -- Public listing: list all accounts under a bank (minimal fields)
@@ -233,41 +294,45 @@ end
 function DepositCash(account, amount)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
-    local changed = MySQL.update.await(
-        'UPDATE `bcc_accounts` SET `cash` = `cash` + ? WHERE `id` = ?',
-        { amount, account }
-    )
-    return (tonumber(changed) or 0) == 1
+    local row = GetAccount(account)
+    if not row then return false end
+    return BanksEconomy.Issue({ toAccountId = row.dollars_account_id, currency = 'dollars',
+        amount = ToUnits(amount), reasonCode = 'banks.transitional.deposit',
+        referenceType = 'bcc_bank_account', referenceId = tostring(account),
+        idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
 end
 
 function DepositGold(account, amount)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
-    local changed = MySQL.update.await(
-        'UPDATE `bcc_accounts` SET `gold` = `gold` + ? WHERE `id` = ?',
-        { amount, account }
-    )
-    return (tonumber(changed) or 0) == 1
+    local row = GetAccount(account)
+    if not row then return false end
+    return BanksEconomy.Issue({ toAccountId = row.gold_account_id, currency = 'gold',
+        amount = ToUnits(amount), reasonCode = 'banks.transitional.deposit',
+        referenceType = 'bcc_bank_account', referenceId = tostring(account),
+        idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
 end
 
 function WithdrawCash(account, amount)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
-    local changed = MySQL.update.await(
-        'UPDATE `bcc_accounts` SET `cash` = `cash` - ? WHERE `id` = ? AND `cash` >= ? AND `is_frozen` = 0',
-        { amount, account, amount }
-    )
-    return (tonumber(changed) or 0) == 1
+    local row = GetAccount(account)
+    if not row or row.is_frozen == 1 or row.is_frozen == true then return false end
+    return BanksEconomy.Destroy({ fromAccountId = row.dollars_account_id, currency = 'dollars',
+        amount = ToUnits(amount), reasonCode = 'banks.transitional.withdrawal',
+        referenceType = 'bcc_bank_account', referenceId = tostring(account),
+        idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
 end
 
 function WithdrawGold(account, amount)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
-    local changed = MySQL.update.await(
-        'UPDATE `bcc_accounts` SET `gold` = `gold` - ? WHERE `id` = ? AND `gold` >= ? AND `is_frozen` = 0',
-        { amount, account, amount }
-    )
-    return (tonumber(changed) or 0) == 1
+    local row = GetAccount(account)
+    if not row or row.is_frozen == 1 or row.is_frozen == true then return false end
+    return BanksEconomy.Destroy({ fromAccountId = row.gold_account_id, currency = 'gold',
+        amount = ToUnits(amount), reasonCode = 'banks.transitional.withdrawal',
+        referenceType = 'bcc_bank_account', referenceId = tostring(account),
+        idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
 end
 
 function TransferAccountCash(fromAccount, toAccount, debitAmount, creditAmount)
@@ -279,16 +344,30 @@ function TransferAccountCash(fromAccount, toAccount, debitAmount, creditAmount)
         return false
     end
 
-    -- A self-join updates both balances in one SQL statement. The WHERE clause
-    -- atomically reserves the source funds, eliminating the read/update race.
-    local changed = MySQL.update.await([[
-        UPDATE `bcc_accounts` AS src
-        INNER JOIN `bcc_accounts` AS dst ON dst.`id` = ?
-        SET src.`cash` = src.`cash` - ?, dst.`cash` = dst.`cash` + ?
-        WHERE src.`id` = ? AND src.`cash` >= ? AND src.`is_frozen` = 0
-    ]], { toAccount, debitAmount, creditAmount, fromAccount, debitAmount })
-
-    return (tonumber(changed) or 0) == 2
+    local source, destination = GetAccount(fromAccount), GetAccount(toAccount)
+    if not source or not destination or source.is_frozen == 1 or source.is_frozen == true then return false end
+    local moved = BanksEconomy.Transfer({ fromAccountId = source.dollars_account_id,
+        toAccountId = destination.dollars_account_id, amount = ToUnits(creditAmount),
+        reasonCode = 'banks.account.transfer', referenceType = 'bcc_bank_account',
+        referenceId = tostring(fromAccount),
+        idempotencyKey = ('banks:transfer:%s'):format(MySQL.scalar.await('SELECT UUID()')) })
+    if not moved.ok then return false end
+    local fee = ToUnits(debitAmount - creditAmount)
+    if fee > 0 then
+        local charged = BanksEconomy.Destroy({ fromAccountId = source.dollars_account_id,
+            currency = 'dollars', amount = fee, reasonCode = 'banks.transfer.fee',
+            referenceType = 'economy_transaction', referenceId = moved.value.transactionId,
+            idempotencyKey = ('banks:fee:%s'):format(moved.value.transactionId) })
+        if not charged.ok then
+            BanksEconomy.Transfer({ fromAccountId = destination.dollars_account_id,
+                toAccountId = source.dollars_account_id, amount = ToUnits(creditAmount),
+                reasonCode = 'banks.transfer.compensation', referenceType = 'economy_transaction',
+                referenceId = moved.value.transactionId,
+                idempotencyKey = ('banks:compensate:%s'):format(moved.value.transactionId) })
+            return false
+        end
+    end
+    return true
 end
 
 function IsAccountLocked(account, src)

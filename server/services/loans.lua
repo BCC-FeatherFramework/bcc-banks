@@ -46,14 +46,14 @@ local function getReminderConfig()
     return timing, reminders
 end
 
-local function getSourceForCharacter(charIdentifier)
-    if not charIdentifier then return nil end
+local function getSourceForCharacter(characterId)
+    if not characterId then return nil end
     for _, playerId in ipairs(GetPlayers()) do
         local src = tonumber(playerId)
-        local user = VORPcore.getUser(src)
+        local user = GetBankingContext(src)
         if user then
-            local character = user.getUsedCharacter
-            if character and tonumber(character.charIdentifier) == tonumber(charIdentifier) then
+            local character = user
+            if character and IdsEqual(character.characterId, characterId) then
                 return src
             end
         end
@@ -64,9 +64,9 @@ end
 local function canViewLoan(src, loan)
     if not loan then return false end
     if IsBankAdmin and IsBankAdmin(src) then return true end
-    local user = VORPcore.getUser(src)
-    local char = user and user.getUsedCharacter
-    local characterId = char and char.charIdentifier
+    local user = GetBankingContext(src)
+    local char = user
+    local characterId = char and char.characterId
     if not characterId then return false end
     if IdsEqual(loan.character_id, characterId) then return true end
     return loan.account_id and (HasAccountAccess(loan.account_id, characterId) or IsAccountOwner(loan.account_id, characterId)) or false
@@ -102,25 +102,25 @@ local function sendDailyReminder(loanRow, info, elapsedDays, dueDays)
     end
 end
 
-BccUtils.RPC:Register('Feather:Banks:GetLoans', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetLoans', function(params, cb, src)
     devPrint('GetLoans RPC called. src=', src, 'params=', params)
 
     local account_id = NormalizeId(params and params.account)
     local bank_id    = NormalizeId(params and params.bank)
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     if not characterId then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
@@ -156,7 +156,7 @@ BccUtils.RPC:Register('Feather:Banks:GetLoans', function(params, cb, src)
     cb(true, list)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetLoan', function(params, cb, src)
     local loan_id = NormalizeId(params and params.loan)
     if not loan_id then
         NotifyClient(src, _U('error_invalid_loan_id'), 'error', 4000)
@@ -183,7 +183,7 @@ BccUtils.RPC:Register('Feather:Banks:GetLoan', function(params, cb, src)
     cb(true, info)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetLoanTransactions', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetLoanTransactions', function(params, cb, src)
     local loan_id = NormalizeId(params and params.loan)
     if not loan_id then
         NotifyClient(src, _U('error_invalid_loan_id'), 'error', 4000)
@@ -218,20 +218,20 @@ BccUtils.RPC:Register('Feather:Banks:GetLoanTransactions', function(params, cb, 
     cb(true, transactions or {})
 end)
 
-BccUtils.RPC:Register('Feather:Banks:ClaimLoanDisbursement', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+exports['feather-core']:RegisterRPC('Feather:Banks:ClaimLoanDisbursement', function(params, cb, src)
+    local user = GetBankingContext(src)
     if not user then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
-    if not char or not char.charIdentifier then
+    local char = user
+    if not char or not char.characterId then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
 
     local loan_id    = NormalizeId(params and params.loan)
     local account_id = NormalizeId(params and params.account)
@@ -264,26 +264,26 @@ BccUtils.RPC:Register('Feather:Banks:ClaimLoanDisbursement', function(params, cb
         '**Bank:** `' .. tostring(BccBanksInternal.getBankName(loan.bank_id or GetBankIdForAccount(account_id))) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Loan Disbursement Claimed', lines, 5763719)
+    QueueBankAuditLog('Loan Disbursement Claimed', lines, 5763719)
     cb(true, res.loan)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:CreateLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:CreateLoan', function(params, cb, src)
     devPrint('CreateLoan RPC called. src=', src, 'params=', params)
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     if not characterId then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
@@ -364,25 +364,25 @@ BccUtils.RPC:Register('Feather:Banks:CreateLoan', function(params, cb, src)
         '**Status:** `' .. tostring(loan.status or 'pending') .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Loan Application Created', lines, 3447003)
+    QueueBankAuditLog('Loan Application Created', lines, 3447003)
     AddLoanTransaction(loan.id, characterId, amount, 'loan - application', 'Loan application submitted')
     cb(true, res.loan)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetLoanRate', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetLoanRate', function(params, cb, src)
+    local user = GetBankingContext(src)
     if not user then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     if not characterId then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
@@ -406,6 +406,10 @@ end)
 
 -- Background: track in-game days passed and enforce defaults -> freeze accounts
 CreateThread(function()
+    while not BccBanksDatabaseReady do
+        Wait(250)
+    end
+
     while true do
         Wait(60000) -- check roughly once per real minute
         local curDay = 0
@@ -445,7 +449,7 @@ CreateThread(function()
                         end
                         -- Mark defaulted and freeze all accounts for owner
                         MySQL.query.await('UPDATE `bcc_loans` SET `is_defaulted` = 1, `status` = "defaulted" WHERE `id` = ?', { ln.id })
-                        SetOwnerAccountsFrozen(tonumber(ln.character_id), true)
+                        SetOwnerAccountsFrozen(ln.character_id, true)
                     end
                 end
             end
@@ -453,22 +457,22 @@ CreateThread(function()
     end
 end)
 
-BccUtils.RPC:Register('Feather:Banks:RepayLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, cb, src)
     devPrint('RepayLoan RPC called. src=', src, 'params=', params)
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     if not characterId then
         NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
         cb(false)
@@ -509,7 +513,7 @@ BccUtils.RPC:Register('Feather:Banks:RepayLoan', function(params, cb, src)
         return
     end
 
-    if tonumber(loanRow.character_id) ~= tonumber(characterId) then
+    if not IdsEqual(loanRow.character_id, characterId) then
         NotifyClient(src, _U('error_no_permission') or 'No permission.', 'error', 4000)
         cb(false)
         return
@@ -559,7 +563,7 @@ BccUtils.RPC:Register('Feather:Banks:RepayLoan', function(params, cb, src)
         cb(false)
         return
     end
-    local removed = pcall(function() char.removeCurrency(0, amount) end)
+    local removed = pcall(function() char.DebitWallet(0, amount) end)
     if not removed then
         ReleasePlayerFinancialLock(src)
         ActiveLoanRepayments[loan_id] = nil
@@ -582,7 +586,7 @@ BccUtils.RPC:Register('Feather:Banks:RepayLoan', function(params, cb, src)
                 { loanRow.character_id }
             )
             if (tonumber(remainingDefaults) or 0) == 0 then
-                SetOwnerAccountsFrozen(tonumber(loanRow.character_id), false)
+                SetOwnerAccountsFrozen(loanRow.character_id, false)
             end
         end
     end
@@ -597,7 +601,7 @@ BccUtils.RPC:Register('Feather:Banks:RepayLoan', function(params, cb, src)
         '**Status:** `' .. tostring((remaining and remaining <= 0) and 'paid' or 'active') .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Loan Repayment', lines, 3066993)
+    QueueBankAuditLog('Loan Repayment', lines, 3066993)
     ReleasePlayerFinancialLock(src)
     ActiveLoanRepayments[loan_id] = nil
     cb(true)

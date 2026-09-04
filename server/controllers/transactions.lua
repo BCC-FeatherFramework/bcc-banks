@@ -2,16 +2,32 @@ function GetAccountTransactions(account)
     local transactions = MySQL.query.await(
         'SELECT ' ..
         '  t.id, t.account_id, t.loan_id, t.character_id, ' ..
-        '  CONCAT(COALESCE(ch.firstname, ""), " ", COALESCE(ch.lastname, "")) AS character_name, ' ..
+        '  t.character_id AS character_name, ' ..
         '  t.amount, t.type, t.description, t.created_at ' ..
         'FROM bcc_transactions AS t ' ..
-        'LEFT JOIN characters AS ch ON ch.charidentifier = t.character_id ' ..
         'LEFT JOIN bcc_loans AS l ON l.id = t.loan_id ' ..
         'WHERE t.account_id = ? OR l.account_id = ? ' ..
         'ORDER BY t.created_at DESC, t.id DESC;',
         { account, account }
     )
-    return transactions or {}
+    transactions = transactions or {}
+
+    local providerResult = exports['feather-core']:GetProvider('character-profile', nil, 1)
+    local provider = type(providerResult) == 'table' and providerResult.ok == true
+        and providerResult.value and providerResult.value.implementation or nil
+    local names = {}
+    for _, transaction in ipairs(transactions) do
+        local characterId = transaction.character_id and tostring(transaction.character_id) or nil
+        if characterId and names[characterId] == nil then
+            local profileResult = provider and provider.GetProfile and provider.GetProfile(characterId) or nil
+            local profile = type(profileResult) == 'table' and profileResult.ok == true and profileResult.value or nil
+            local fullName = profile and ((profile.firstName or '') .. ' ' .. (profile.lastName or ''))
+                :gsub('%s+', ' '):match('^%s*(.-)%s*$') or ''
+            names[characterId] = fullName ~= '' and fullName or characterId
+        end
+        transaction.character_name = characterId and names[characterId] or '-'
+    end
+    return transactions
 end
 
 local function insertTransaction(query, params)
@@ -25,7 +41,7 @@ local function insertTransaction(query, params)
 
         local errStr = err and tostring(err) or ''
         if errStr:find('Duplicate entry', 1, true) then
-            params[1] = BccUtils.UUID()
+            params[1] = MySQL.scalar.await('SELECT UUID()')
         else
             error(err)
         end
@@ -35,7 +51,7 @@ end
 
 function AddAccountTransaction(account, character, amount, txType, description)
     local params = {
-        BccUtils.UUID(),
+        MySQL.scalar.await('SELECT UUID()'),
         account,
         character,
         amount,
@@ -62,7 +78,7 @@ end
 
 function AddLoanTransaction(loan, character, amount, txType, description)
     local params = {
-        BccUtils.UUID(),
+        MySQL.scalar.await('SELECT UUID()'),
         loan,
         character,
         amount,
@@ -78,7 +94,7 @@ end
 
 function AddCharacterTransaction(character, amount, txType, description)
     local params = {
-        BccUtils.UUID(),
+        MySQL.scalar.await('SELECT UUID()'),
         character,
         amount,
         txType,

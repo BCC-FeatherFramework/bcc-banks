@@ -4,7 +4,7 @@ Banks = {}
 
 RegisterCommand('banksReady', function(src, args, rawCommand)  -- correct param order
     devPrint("DEBUG: Registering command 'banksReady'.")
-    local ok; ok, Banks = BccUtils.RPC:CallAsync('Feather:Banks:GetBanks', {})
+    local ok; ok, Banks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
     if not ok or not Banks or #Banks <= 0 then
         error('Unable to retrieve banks!')
         return
@@ -19,7 +19,7 @@ CreateThread(function()
     Wait(2000)
     devPrint("DEBUG: Initializing banks (auto instead of command).")
 
-    local ok; ok, Banks = BccUtils.RPC:CallAsync('Feather:Banks:GetBanks', {})
+    local ok; ok, Banks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
     if not ok or not Banks or #Banks <= 0 then
         error('Unable to retrieve banks!')
         return
@@ -30,19 +30,19 @@ CreateThread(function()
     devPrint("DEBUG: Banks are ready and Feather:Banks:Start triggered.")
 end)
 
-FeatherMenu = exports['feather-menu'].initiate()
+FeatherMenu = FeatherMenuV2Compat
 FeatherBankMenu = FeatherMenu:RegisterMenu('feather:bank:menu', {
     top = '3%',
     left = '3%',
-    ['720width'] = '400px',
-    ['1080width'] = '500px',
-    ['2kwidth'] = '600px',
-    ['4kwidth'] = '800px',
+    ['720width'] = '320px',
+    ['1080width'] = '360px',
+    ['2kwidth'] = '450px',
+    ['4kwidth'] = '520px',
     style = {},
     contentslot = {
         style = {
-            ['height'] = '450px',
-            ['min-height'] = '350px'
+            ['height'] = 'auto',
+            ['min-height'] = 'auto'
         }
     },
     draggable = true,
@@ -191,17 +191,18 @@ RegisterNetEvent('Feather:Banks:Start', function()
                 sleep = false
                 if bank.isClosed then
                     -- Disable open prompt and show a closed message with opening hours like stables/guarma
-                    if GetOpenPrompt() then GetOpenPrompt():EnabledPrompt(false) end
+                    if GetOpenPrompt() then exports['feather-toolkit']:SetPromptEnabled(GetOpenPrompt(), false) end
                     local openTxt = tostring(bank.open_hour or '')
                     local closeTxt = tostring(bank.close_hour or '')
                     local label = ( _U('bank_label') or 'Bank') .. (_U('hours') or ' is open from ~o~') .. openTxt .. (_U('to') or ':00~q~ to ~o~') .. closeTxt .. (_U('hundred') or ':00')
-                    GetClosedPromptGroup():ShowGroup(label)
+                    exports['feather-toolkit']:ShowPromptGroup(GetClosedPromptGroup(), label)
                     devPrint("DEBUG: Showing closed prompt for bank", bank.name, 'hours', openTxt, closeTxt)
                 else
                     -- Re-enable open prompt when bank is open
-                    if GetOpenPrompt() then GetOpenPrompt():EnabledPrompt(true) end
-                    GetOpenPromptGroup():ShowGroup(bank.name)
-                    if GetOpenPrompt():HasCompleted() then
+                    if GetOpenPrompt() then exports['feather-toolkit']:SetPromptEnabled(GetOpenPrompt(), true) end
+                    exports['feather-toolkit']:ShowPromptGroup(GetOpenPromptGroup(), bank.name)
+                    local promptState = exports['feather-toolkit']:IsPromptCompleted(GetOpenPrompt())
+                    if promptState and promptState.ok == true and promptState.value.completed == true then
                         OpenUI(bank)
                         devPrint("DEBUG: Prompt completed, opening UI for bank", bank.name)
                     end
@@ -241,7 +242,7 @@ end)
 -- Server-triggered refresh after admin changes (hours etc.)
 RegisterNetEvent('Feather:Banks:Refresh', function()
     devPrint("DEBUG: Refresh event received; reloading banks.")
-    local ok, refreshedBanks = BccUtils.RPC:CallAsync('Feather:Banks:GetBanks', {})
+    local ok, refreshedBanks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
     if not ok or not refreshedBanks then
         devPrint("DEBUG: Refresh failed to load banks.")
         return

@@ -39,7 +39,7 @@ local function OpenLoanTransactionsPage(loanIdStr, parentPage)
     })
     txPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, txRows = BccUtils.RPC:CallAsync('Feather:Banks:GetLoanTransactions', { loan = loanIdStr })
+    local ok, txRows = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoanTransactions', { loan = loanIdStr })
     txRows = (ok and txRows) or {}
 
     if #txRows > 0 then
@@ -110,7 +110,7 @@ function OpenUI(bank)
     end
 
     if Config.UseBankerBusy then
-        local acquired = BccUtils.RPC:CallAsync('Feather:Banks:SetBankerBusy', { bank = bankId, state = true })
+        local acquired = exports['feather-core']:CallRPCAsync('Feather:Banks:SetBankerBusy', { bank = bankId, state = true })
         if not acquired then
             Notify(_U("banker_busy_notify"), 4000)
             return
@@ -195,7 +195,7 @@ function OpenTransactionsPage(acc, ParentPage)
         slot = 'header',
         style = {}
     })
-    local ok, data = BccUtils.RPC:CallAsync('Feather:Banks:GetTransactions', { account = NormalizeId(acc.id) })
+    local ok, data = exports['feather-core']:CallRPCAsync('Feather:Banks:GetTransactions', { account = NormalizeId(acc.id) })
     devPrint("RPC call status:", ok)
     if not ok then
         local msg = (data and data.message) and data.message or _U("failed_fetch_transactions")
@@ -343,7 +343,7 @@ function OpenLoanApplyAccountSelect(bank, ParentPage)
     })
     LoanApplySelectAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, accounts = BccUtils.RPC:CallAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
     if not ok or not accounts or #accounts == 0 then
         LoanApplySelectAccountPage:RegisterElement('textdisplay', {
             value = _U('no_accounts_found'),
@@ -397,7 +397,7 @@ function OpenLoanApplyForm(account, bank, ParentPage)
     end)
 
     -- Fetch server-defined interest rate for this character/account
-    local okRate, rate = BccUtils.RPC:CallAsync('Feather:Banks:GetLoanRate', { account = NormalizeId(account.id) })
+    local okRate, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoanRate', { account = NormalizeId(account.id) })
     rate = tonumber(rate) or 10.0
     LoanApplyFormPage:RegisterElement('textdisplay', {
         value = _U('loan_interest_label') .. ': ' .. tostring(rate) .. '%',
@@ -460,7 +460,7 @@ function OpenLoanApplyForm(account, bank, ParentPage)
         ConfirmPage:RegisterElement('button', {
             label = _U('confirm_button')
         }, function()
-            local ok = BccUtils.RPC:CallAsync('Feather:Banks:CreateLoan', {
+            local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:CreateLoan', {
                 account = NormalizeId(account.id),
                 amount = amount,
                 duration = duration
@@ -522,7 +522,7 @@ function OpenLoanApplyForm_NoAccount(bank, ParentPage)
     end)
 
     -- Fetch server-defined interest rate for this character at this bank
-    local okRate, rate = BccUtils.RPC:CallAsync('Feather:Banks:GetLoanRate', { bank = bank.id })
+    local okRate, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoanRate', { bank = bank.id })
     rate = tonumber(rate) or 10.0
     LoanApplyFormNoAccountPage:RegisterElement('textdisplay', {
         value = _U('interest_rate_display', tostring(rate)),
@@ -580,7 +580,7 @@ function OpenLoanApplyForm_NoAccount(bank, ParentPage)
         ConfirmPage:RegisterElement('button', {
             label = _U('confirm_button')
         }, function()
-            local ok = BccUtils.RPC:CallAsync('Feather:Banks:CreateLoan', {
+            local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:CreateLoan', {
                 bank = bank.id,
                 amount = amount,
                 duration = duration
@@ -637,7 +637,7 @@ function OpenLoansListPage_NoAccount(bank, ParentPage)
     })
     LoansListNoAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, loans = BccUtils.RPC:CallAsync('Feather:Banks:GetLoans', { bank = bank.id })
+    local ok, loans = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoans', { bank = bank.id })
     loans = loans or {}
     if not ok or #loans == 0 then
         LoansListNoAccountPage:RegisterElement('textdisplay', {
@@ -687,7 +687,7 @@ function OpenLoansListPage(account, bank, ParentPage)
     })
     LoansListPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, loans = BccUtils.RPC:CallAsync('Feather:Banks:GetLoans', { account = NormalizeId(account.id) })
+    local ok, loans = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoans', { account = NormalizeId(account.id) })
     loans = loans or {}
     if not ok or #loans == 0 then
         LoansListPage:RegisterElement('textdisplay', {
@@ -732,7 +732,7 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
         return
     end
 
-    local ok, info = BccUtils.RPC:CallAsync('Feather:Banks:GetLoan', { loan = loanIdStr })
+    local ok, info = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoan', { loan = loanIdStr })
     if not ok or not info then
         Notify(_U('failed_fetch_loan'), 4000)
         return
@@ -816,7 +816,7 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
         ConfirmPage:RegisterElement('button', {
             label = _U('confirm_button')
         }, function()
-            BccUtils.RPC:CallAsync('Feather:Banks:RepayLoan', { loan = loanIdStr, amount = amt })
+            exports['feather-core']:CallRPCAsync('Feather:Banks:RepayLoan', { loan = loanIdStr, amount = amt })
             OpenLoanDetailsPage(account, bank, loanIdStr, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
@@ -863,7 +863,7 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
         return
     end
 
-    local ok, info = BccUtils.RPC:CallAsync('Feather:Banks:GetLoan', { loan = loanIdStr })
+    local ok, info = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoan', { loan = loanIdStr })
     if not ok or not info then
         Notify(_U('failed_fetch_loan'), 4000)
         return
@@ -953,7 +953,7 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
             ConfirmPage:RegisterElement('button', {
                 label = _U('confirm_button')
             }, function()
-                BccUtils.RPC:CallAsync('Feather:Banks:RepayLoan', { loan = loanId, amount = amt })
+                exports['feather-core']:CallRPCAsync('Feather:Banks:RepayLoan', { loan = loanId, amount = amt })
                 OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
             end)
             ConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
@@ -1001,7 +1001,7 @@ function OpenLoanClaimSelectAccount(bank, loanId, ParentPage)
     })
     LoanClaimSelectAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, accounts = BccUtils.RPC:CallAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
     if not ok or not accounts or #accounts == 0 then
         LoanClaimSelectAccountPage:RegisterElement('textdisplay', { value = _U('no_accounts_found'), slot = 'content' })
     else
@@ -1010,7 +1010,7 @@ function OpenLoanClaimSelectAccount(bank, loanId, ParentPage)
             label = account.account_name,
             style = {}
         }, function()
-                local success = BccUtils.RPC:CallAsync('Feather:Banks:ClaimLoanDisbursement', { loan = NormalizeId(loanId), account = NormalizeId(account.id) })
+                local success = exports['feather-core']:CallRPCAsync('Feather:Banks:ClaimLoanDisbursement', { loan = NormalizeId(loanId), account = NormalizeId(account.id) })
                 if success then
                     Notify(_U('loan_claim_success') or 'Funds transferred to account.', 'success', 4000)
                 end

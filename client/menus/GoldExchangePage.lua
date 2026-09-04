@@ -1,7 +1,7 @@
 function OpenGoldExchangePage(bank, ParentPage)
     local GoldExchangePage = FeatherBankMenu:RegisterPage('bank:page:gold:' .. tostring(bank.id))
 
-    local ok, rates = BccUtils.RPC:CallAsync('Feather:Banks:GetGoldRates', {})
+    local ok, rates = exports['feather-core']:CallRPCAsync('Feather:Banks:GetGoldRates', {})
     rates = rates or { buy = 10.0, sell = 9.0 }
 
     local function round2(n)
@@ -80,7 +80,7 @@ function OpenGoldExchangePage(bank, ParentPage)
         ConfirmPage:RegisterElement('button', {
             label = _U('confirm_button')
         }, function()
-            BccUtils.RPC:CallAsync('Feather:Banks:BuyGold', { gold = goldAmt })
+            exports['feather-core']:CallRPCAsync('Feather:Banks:BuyGold', { gold = goldAmt })
             OpenGoldExchangePage(bank, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', {
@@ -134,7 +134,7 @@ function OpenGoldExchangePage(bank, ParentPage)
         ConfirmPage:RegisterElement('button', {
             label = _U('confirm_button')
         }, function()
-            BccUtils.RPC:CallAsync('Feather:Banks:SellGold', { gold = goldAmt })
+            exports['feather-core']:CallRPCAsync('Feather:Banks:SellGold', { gold = goldAmt })
             OpenGoldExchangePage(bank, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', {
@@ -196,7 +196,7 @@ function OpenGoldExchangePage(bank, ParentPage)
         ConfirmPage:RegisterElement('button', {
             label = _U('confirm_button')
         }, function()
-            BccUtils.RPC:CallAsync('Feather:Banks:ExchangeGoldBars', { count = count })
+            exports['feather-core']:CallRPCAsync('Feather:Banks:ExchangeGoldBars', { count = count })
             OpenGoldExchangePage(bank, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', {

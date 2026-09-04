@@ -1,8 +1,8 @@
-BccUtils.RPC:Register('Feather:Banks:GetBanks', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetBanks', function(params, cb, src)
     cb(true, GetBanks())
 end)
 
-BccUtils.RPC:Register('Feather:Banks:CreateBank', function(params, res, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:CreateBank', function(params, res, src)
     if not IsBankAdmin or not IsBankAdmin(src) then
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
         res(false)
@@ -25,7 +25,7 @@ BccUtils.RPC:Register('Feather:Banks:CreateBank', function(params, res, src)
         return
     end
 
-    local bankId = BccUtils.UUID()
+    local bankId = MySQL.scalar.await('SELECT UUID()')
     local ok = MySQL.query.await('INSERT INTO `bcc_banks` (id, name, x, y, z, h) VALUES (?, ?, ?, ?, ?, ?);', { bankId, name, x, y, z, heading })
     if ok == nil then
         NotifyClient(src, _U('admin_action_failed') or 'Action failed.', 'error', 3500)
@@ -36,7 +36,7 @@ BccUtils.RPC:Register('Feather:Banks:CreateBank', function(params, res, src)
     res(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetBankerBusy', function(params, res, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetBankerBusy', function(params, res, src)
     if not Config.UseBankerBusy then
         res(true, false)
         return
@@ -49,7 +49,7 @@ BccUtils.RPC:Register('Feather:Banks:GetBankerBusy', function(params, res, src)
     res(true, IsBankerBusy(bank, src))
 end)
 
-BccUtils.RPC:Register('Feather:Banks:SetBankerBusy', function(params, res, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:SetBankerBusy', function(params, res, src)
     if not Config.UseBankerBusy then
         if res then res(true) end
         return

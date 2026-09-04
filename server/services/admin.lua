@@ -25,67 +25,6 @@ local function sendMailToCharacter(charId, fromName, subject, body)
         end
         api:SendMailToCharacter(charId, subject, body, { fromName = fromName })
 
-    -- ── syn_mail ──────────────────────────────────────────────────────────────
-    elseif script == 'syn_mail' then
-        devPrint('[Mail] syn_mail: looking up address for charId=', charId)
-        local addrRow = MySQL.query.await(
-            'SELECT `address` FROM `mail` WHERE `charidentifier` = ? LIMIT 1',
-            { charId }
-        )
-        if not addrRow or not addrRow[1] then
-            devPrint('[Mail] syn_mail: no address found for charId=', charId)
-            return
-        end
-        local toAddress = tostring(addrRow[1].address)
-        local toField = '["' .. toAddress .. '"]'
-        devPrint('[Mail] syn_mail: inserting mail for address=', toAddress)
-        local dateStr = os.date('%Y-%m-%d %H:%M:%S')
-
-        local insertedId = nil
-        local ok, err = pcall(function()
-            local res = MySQL.query.await(
-                'INSERT INTO `mails` (`anon`, `read`, `from`, `to`, `subject`, `body`, `folder`, `fromName`, `toNames`, `date`, `hidesent`, `copyTo`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                { 0, 0, '0', toField, subject, body, 'Inbox', fromName, '[]', dateStr, 1, toAddress }
-            )
-            insertedId = res and res.insertId
-        end)
-        if not ok then
-            devPrint('[Mail] syn_mail: DB insert failed:', err)
-            return
-        end
-        devPrint('[Mail] syn_mail: DB insert success, insertId=', insertedId)
-
-        if insertedId then
-            local mailObj = {
-                id       = insertedId,
-                anon     = false,
-                read     = false,
-                ['from'] = '0',
-                ['to']   = toField,
-                subject  = subject,
-                body     = body,
-                folder   = 'Inbox',
-                fromName = fromName,
-                toNames  = '[]',
-                date     = dateStr,
-                hidesent = true,
-                copyTo   = toAddress,
-            }
-            for _, playerId in ipairs(GetPlayers()) do
-                local user = VORPcore.getUser(tonumber(playerId))
-                if user and user.getUsedCharacter then
-                    local ch = user.getUsedCharacter
-                    if tostring(ch.charIdentifier) == tostring(charId) then
-                        local pid = tonumber(playerId)
-                        TriggerClientEvent('syn_mail:rec_addedMailid', pid, mailObj, true)
-                        TriggerEvent('syn_mail:signcharacter', pid)
-                        devPrint('[Mail] syn_mail: pushed mail to online player src=', playerId)
-                        break
-                    end
-                end
-            end
-        end
-
     -- ── custom server event ───────────────────────────────────────────────────
     elseif script == 'custom' then
         local event = tostring(mailCfg.CustomEvent or '')
@@ -219,54 +158,33 @@ function IsBankAdmin(src)
     devPrint('[ADMIN] IsBankAdmin called. src=', src)
 
     local AdminCfg = (Config and Config.Admin) or {}
-    local allowConsole = (AdminCfg.allowConsole ~= false) -- default true
-    local useAce = (AdminCfg.useAce == true)
-    local acePerm = AdminCfg.acePermission or 'feather.banks.admin'
-    local groups = AdminCfg.groups or Config.adminGroups or {}
-    local jobs = AdminCfg.jobs or Config.AllowedJobs or {}
-
-    if src == 0 and allowConsole then
+    if src == 0 and AdminCfg.allowConsole ~= false then
         devPrint('[ADMIN] Granting admin: source is console (0)')
         return true
     end
 
-    if useAce and IsPlayerAceAllowed then
-        local ace = IsPlayerAceAllowed(src, acePerm)
-        devPrint('[ADMIN] ACE check', acePerm, '=', ace and 'true' or 'false')
-        if ace then return true end
-    end
-
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
-        devPrint('[ADMIN] Deny: VORP user/character not found for src', src)
+    local resolved = exports['feather-roles']:GetActorRole(src)
+    if type(resolved) ~= 'table' or resolved.ok ~= true
+        or type(resolved.value) ~= 'table' or type(resolved.value.role) ~= 'table' then
+        devPrint('[ADMIN] Deny: Feather Roles could not resolve the active character role.',
+            type(resolved) == 'table' and resolved.code or 'invalid_result')
         return false
     end
-    local character = user.getUsedCharacter
 
-    devPrint('[ADMIN] Character group=', tostring(character.group), 'job=', tostring(character.job), 'charId=', tostring(character.charIdentifier))
-    devPrint('[ADMIN] Admin groups=', json.encode(groups), 'jobs=', json.encode(jobs))
-
-    -- Group check
-    for _, group in ipairs(groups) do
-        if character.group == group then
-            devPrint('[ADMIN] Granting admin by group match:', group)
+    local actorRole = resolved.value.role
+    for _, roleKey in ipairs(AdminCfg.roles or { 'admin', 'owner' }) do
+        if actorRole.key == roleKey then
+            devPrint('[ADMIN] Granting admin through Feather role:', actorRole.key,
+                'level=', actorRole.level, 'character=', resolved.value.characterId)
             return true
         end
     end
 
-    -- Job check
-    for _, job in ipairs(jobs) do
-        if character.job == job then
-            devPrint('[ADMIN] Granting admin by job match:', job)
-            return true
-        end
-    end
-
-    devPrint('[ADMIN] Deny: no matching ACE/group/job')
+    devPrint('[ADMIN] Deny: Feather role is not allowed:', actorRole.key, 'level=', actorRole.level)
     return false
 end
 
-BccUtils.RPC:Register('Feather:Banks:CheckAdmin', function(_, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:CheckAdmin', function(_, cb, src)
     devPrint('[DEV] RPC Feather:Banks:CheckAdmin called by src=' .. tostring(src))
     local allowed = IsBankAdmin(src) == true
     -- Return (ok=true, payload=allowed) to match other RPC patterns
@@ -280,7 +198,7 @@ local function isValidInterestRate(value)
         and rate >= 0 and rate <= 100
 end
 
-BccUtils.RPC:Register('Feather:Banks:Admin:GetBankRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetBankRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] GetBankRate denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -299,7 +217,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:GetBankRate', function(params, cb, sr
     cb(true, rate and tonumber(rate) or nil)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:SetBankRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetBankRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] SetBankRate denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -319,7 +237,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:SetBankRate', function(params, cb, sr
 end)
 
 -- RPC: get/set/clear char rate
-BccUtils.RPC:Register('Feather:Banks:Admin:GetCharRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetCharRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] GetCharRate denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -345,7 +263,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:GetCharRate', function(params, cb, sr
     cb(true, rate and tonumber(rate) or nil)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:SetCharRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetCharRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] SetCharRate denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -370,7 +288,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:SetCharRate', function(params, cb, sr
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:ClearCharRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ClearCharRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ClearCharRate denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -398,45 +316,28 @@ end)
 
 local function attachLoanBorrowerNames(rows)
     if not rows or #rows == 0 then return end
-    local ids, seen = {}, {}
-    for _, row in ipairs(rows) do
-        local charId = row.character_id
-        if charId ~= nil then
-            local key = tostring(charId)
-            if key ~= '' and not seen[key] then
-                seen[key] = true
-                ids[#ids + 1] = key
-            end
-        end
-    end
-
-    if #ids == 0 then return end
-
-    local placeholders = {}
-    for i = 1, #ids do
-        placeholders[i] = '?'
-    end
-
-    local query = 'SELECT charidentifier, firstname, lastname FROM characters WHERE charidentifier IN (' .. table.concat(placeholders, ',') .. ')'
-    local records = MySQL.query.await(query, ids) or {}
+    local providerResult = exports['feather-core']:GetProvider('character-profile', nil, 1)
+    local provider = type(providerResult) == 'table' and providerResult.ok == true
+        and providerResult.value and providerResult.value.implementation or nil
     local names = {}
-    for _, rec in ipairs(records) do
-        local key = rec.charidentifier and tostring(rec.charidentifier) or nil
-        if key and key ~= '' then
-            names[key] = { firstname = rec.firstname, lastname = rec.lastname }
-        end
-    end
-
     for _, row in ipairs(rows) do
         local key = row.character_id and tostring(row.character_id) or nil
+        if key and names[key] == nil then
+            local profileResult = provider and provider.GetProfile and provider.GetProfile(key) or nil
+            local profile = type(profileResult) == 'table' and profileResult.ok == true and profileResult.value or nil
+            names[key] = profile and {
+                firstname = profile.firstName,
+                lastname = profile.lastName
+            } or false
+        end
         if key and names[key] then
             row.borrower_firstname = names[key].firstname
-            row.borrower_lastname  = names[key].lastname
+            row.borrower_lastname = names[key].lastname
         end
     end
 end
 
-BccUtils.RPC:Register('Feather:Banks:Admin:ListAccounts', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListAccounts', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListAccounts denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -452,37 +353,14 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ListAccounts', function(params, cb, s
     end
     local rows = MySQL.query.await('SELECT id, name, owner_id, cash, gold FROM `bcc_accounts` WHERE bank_id = ? ORDER BY id DESC', { bankId })
     for _, row in ipairs(rows or {}) do
-        local fn, ln = nil, nil
-        local numericId = tonumber(row.owner_id)
-        if numericId then
-            for _, playerId in ipairs(GetPlayers()) do
-                local user = VORPcore.getUser(tonumber(playerId))
-                if user then
-                    local ch = user.getUsedCharacter
-                    if ch and tonumber(ch.charIdentifier) == numericId then
-                        fn = ch.firstname or ch.firstName
-                        ln = ch.lastname or ch.lastName
-                        break
-                    end
-                end
-            end
-
-            if not fn and not ln then
-                local nameRow = MySQL.query.await('SELECT firstname, lastname FROM characters WHERE charidentifier = ? LIMIT 1', { numericId })
-                nameRow = nameRow and nameRow[1] or nil
-                if nameRow then
-                    fn = nameRow.firstname
-                    ln = nameRow.lastname
-                end
-            end
-        end
+        local fn, ln = GetCharacterName(row.owner_id)
         row.owner_firstname = fn
         row.owner_lastname = ln
     end
     cb(true, rows or {})
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:ListFrozenAccounts', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListFrozenAccounts', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListFrozenAccounts denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -500,30 +378,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ListFrozenAccounts', function(params,
 
     local rows = MySQL.query.await('SELECT id, name, owner_id, account_number, cash, gold FROM `bcc_accounts` WHERE bank_id = ? AND is_frozen = 1 ORDER BY id DESC', { bankId })
     for _, row in ipairs(rows or {}) do
-        local fn, ln = nil, nil
-        local numericId = tonumber(row.owner_id)
-        if numericId then
-            for _, playerId in ipairs(GetPlayers()) do
-                local user = VORPcore.getUser(tonumber(playerId))
-                if user then
-                    local ch = user.getUsedCharacter
-                    if ch and tonumber(ch.charIdentifier) == numericId then
-                        fn = ch.firstname or ch.firstName
-                        ln = ch.lastname or ch.lastName
-                        break
-                    end
-                end
-            end
-
-            if not fn and not ln then
-                local nameRow = MySQL.query.await('SELECT firstname, lastname FROM characters WHERE charidentifier = ? LIMIT 1', { numericId })
-                nameRow = nameRow and nameRow[1] or nil
-                if nameRow then
-                    fn = nameRow.firstname
-                    ln = nameRow.lastname
-                end
-            end
-        end
+        local fn, ln = GetCharacterName(row.owner_id)
         row.owner_firstname = fn
         row.owner_lastname = ln
     end
@@ -531,7 +386,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ListFrozenAccounts', function(params,
 end)
 
 -- Admin: get full account details (bypass access rules, admin-only)
-BccUtils.RPC:Register('Feather:Banks:Admin:GetAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetAccount', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] GetAccount denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -556,28 +411,15 @@ BccUtils.RPC:Register('Feather:Banks:Admin:GetAccount', function(params, cb, src
 
     do
         local fn, ln = nil, nil
-        local numericId = tonumber(row.owner_id)
-        if numericId then
-            for _, playerId in ipairs(GetPlayers()) do
-                local user = VORPcore.getUser(tonumber(playerId))
-                if user then
-                    local ch = user.getUsedCharacter
-                    if ch and tonumber(ch.charIdentifier) == numericId then
-                        fn = ch.firstname or ch.firstName
-                        ln = ch.lastname or ch.lastName
-                        break
-                    end
-                end
-            end
-
-            if not fn and not ln then
-                local nameRow = MySQL.query.await('SELECT firstname, lastname FROM characters WHERE charidentifier = ? LIMIT 1', { numericId })
-                nameRow = nameRow and nameRow[1] or nil
-                if nameRow then
-                    fn = nameRow.firstname
-                    ln = nameRow.lastname
-                end
-            end
+        local ownerId = row.owner_id and tostring(row.owner_id) or nil
+        if ownerId then
+            local providerResult = exports['feather-core']:GetProvider('character-profile', nil, 1)
+            local provider = type(providerResult) == 'table' and providerResult.ok == true
+                and providerResult.value and providerResult.value.implementation or nil
+            local profileResult = provider and provider.GetProfile and provider.GetProfile(ownerId) or nil
+            local profile = type(profileResult) == 'table' and profileResult.ok == true and profileResult.value or nil
+            fn = profile and profile.firstName or nil
+            ln = profile and profile.lastName or nil
         end
         row.owner_firstname = fn
         row.owner_lastname = ln
@@ -587,7 +429,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:GetAccount', function(params, cb, src
     cb(true, { account = row, transactions = tx or {} })
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:UnfreezeAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:UnfreezeAccount', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] UnfreezeAccount denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -616,7 +458,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:UnfreezeAccount', function(params, cb
         return
     end
 
-    local ownerId = tonumber(row.owner_id)
+    local ownerId = NormalizeId(row.owner_id)
     if ownerId then
         SetOwnerAccountsFrozen(ownerId, false)
     else
@@ -626,7 +468,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:UnfreezeAccount', function(params, cb
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:SetAccountFrozen', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetAccountFrozen', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] SetAccountFrozen denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -654,7 +496,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:SetAccountFrozen', function(params, c
     cb(true, { is_frozen = shouldFreeze })
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:DeleteAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:DeleteAccount', function(params, cb, src)
     devPrint('[ADMIN] DeleteAccount called by src=', src, 'params=', params)
 
     if not IsBankAdmin(src) then
@@ -689,7 +531,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:DeleteAccount', function(params, cb, 
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:ListLoans', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListLoans', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListLoans denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -710,16 +552,16 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ListLoans', function(params, cb, src)
                a.owner_id AS account_owner_id
         FROM `bcc_loans` AS l
         LEFT JOIN `bcc_accounts` AS a ON l.account_id = a.id
-        WHERE (a.bank_id = ? OR l.bank_id = ?)
+        WHERE l.bank_id = ?
         ORDER BY l.created_at DESC
-    ]], { bankId, bankId })
+    ]], { bankId })
     attachLoanBorrowerNames(rows)
     enrichLoanFinancials(rows)
     cb(true, rows or {})
 end)
 
 -- List only pending loans by bank
-BccUtils.RPC:Register('Feather:Banks:Admin:ListPendingLoans', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListPendingLoans', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListPendingLoans denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -740,16 +582,16 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ListPendingLoans', function(params, c
                a.owner_id AS account_owner_id
         FROM `bcc_loans` AS l
         LEFT JOIN `bcc_accounts` AS a ON l.account_id = a.id
-        WHERE (a.bank_id = ? OR l.bank_id = ?) AND l.status = "pending"
+        WHERE l.bank_id = ? AND LOWER(TRIM(l.status)) = 'pending'
         ORDER BY l.created_at DESC
-    ]], { bankId, bankId })
+    ]], { bankId })
     attachLoanBorrowerNames(rows)
     enrichLoanFinancials(rows)
     cb(true, rows or {})
 end)
 
 -- Approve a loan
-BccUtils.RPC:Register('Feather:Banks:Admin:ApproveLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ApproveLoan', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ApproveLoan denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -762,13 +604,13 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ApproveLoan', function(params, cb, sr
         cb(false)
         return
     end
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         NotifyClient(src, _U('error_character_not_found') or 'Character not found', 'error', 3500)
         cb(false)
         return
     end
-    local approver = user.getUsedCharacter.charIdentifier
+    local approver = user.characterId
     local res = ApproveLoan(loanId, approver)
     if res and res.status then
         sendLoanStatusMail(res.loan, 'approved')
@@ -782,7 +624,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ApproveLoan', function(params, cb, sr
             '**Amount:** `$' .. tostring(res.loan and res.loan.amount or 'Unknown') .. '`',
             '**Approved By:** `' .. tostring(approverName) .. ' (' .. tostring(approver) .. ')`',
         }
-        SendBankDiscordLog('Bank Loan Approved', lines, 3066993)
+        QueueBankAuditLog('Bank Loan Approved', lines, 3066993)
         AddLoanTransaction(loanId, res.loan and res.loan.character_id, tonumber(res.loan and res.loan.amount) or 0, 'loan - approved', 'Loan approved by character #' .. tostring(approver))
         NotifyClient(src, _U('admin_loan_approved') or 'Loan approved and disbursed.', 'success', 3000)
         cb(true)
@@ -793,7 +635,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ApproveLoan', function(params, cb, sr
 end)
 
 -- Reject a loan
-BccUtils.RPC:Register('Feather:Banks:Admin:RejectLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:RejectLoan', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] RejectLoan denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -806,13 +648,13 @@ BccUtils.RPC:Register('Feather:Banks:Admin:RejectLoan', function(params, cb, src
         cb(false)
         return
     end
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         NotifyClient(src, _U('error_character_not_found') or 'Character not found', 'error', 3500)
         cb(false)
         return
     end
-    local approver = user.getUsedCharacter.charIdentifier
+    local approver = user.characterId
     local res = RejectLoan(loanId, approver)
     if res and res.status then
         sendLoanStatusMail(res.loan, 'rejected')
@@ -826,7 +668,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:RejectLoan', function(params, cb, src
             '**Amount:** `$' .. tostring(res.loan and res.loan.amount or 'Unknown') .. '`',
             '**Rejected By:** `' .. tostring(approverName) .. ' (' .. tostring(approver) .. ')`',
         }
-        SendBankDiscordLog('Bank Loan Rejected', lines, 15158332)
+        QueueBankAuditLog('Bank Loan Rejected', lines, 15158332)
         AddLoanTransaction(loanId, res.loan and res.loan.character_id, tonumber(res.loan and res.loan.amount) or 0, 'loan - rejected', 'Loan rejected by character #' .. tostring(approver))
         NotifyClient(src, _U('admin_loan_rejected') or 'Loan rejected.', 'success', 3000)
         cb(true)
@@ -836,7 +678,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:RejectLoan', function(params, cb, src
     end
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:ListSDBs', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListSDBs', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListSDBs denied: no permission for src', src)
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
@@ -857,7 +699,7 @@ end)
 -- Legacy admin commands were removed in favor of the /bankadmin UI.
 
 -- Admin: Get/Set bank opening hours
-BccUtils.RPC:Register('Feather:Banks:Admin:GetHours', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetHours', function(params, cb, src)
     if not IsBankAdmin(src) then
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
@@ -878,7 +720,7 @@ BccUtils.RPC:Register('Feather:Banks:Admin:GetHours', function(params, cb, src)
     cb(true, { hours_active = (data.hours_active == 1 or data.hours_active == true), open_hour = data.open_hour, close_hour = data.close_hour })
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:SetHours', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetHours', function(params, cb, src)
     if not IsBankAdmin(src) then
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
@@ -911,8 +753,8 @@ BccUtils.RPC:Register('Feather:Banks:Admin:SetHours', function(params, cb, src)
     MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ?, open_hour = ?, close_hour = ? WHERE id = ?', { actv, openH, closeH, bankId })
     -- Notify all clients to refresh bank data
     TriggerClientEvent('Feather:Banks:Refresh', -1)
-    local adminUser = VORPcore.getUser(src)
-    local adminId = adminUser and adminUser.getUsedCharacter and adminUser.getUsedCharacter.charIdentifier or 'Unknown'
+    local adminUser = GetBankingContext(src)
+    local adminId = adminUser and adminUser.characterId or 'Unknown'
     local lines = {
         '**Action:** `Bank Hours Updated`',
         '**Bank:** `' .. tostring(BccBanksInternal.getBankName(bankId)) .. '`',
@@ -921,11 +763,11 @@ BccUtils.RPC:Register('Feather:Banks:Admin:SetHours', function(params, cb, src)
         '**Close Hour:** `' .. tostring(closeH) .. '`',
         '**Admin:** `' .. tostring(BccBanksInternal.getCharacterNameById(adminId)) .. ' (' .. tostring(adminId) .. ')`',
     }
-    SendBankDiscordLog('Bank Hours Updated', lines, 3447003)
+    QueueBankAuditLog('Bank Hours Updated', lines, 3447003)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:ToggleHours', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ToggleHours', function(params, cb, src)
     if not IsBankAdmin(src) then
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
@@ -941,14 +783,14 @@ BccUtils.RPC:Register('Feather:Banks:Admin:ToggleHours', function(params, cb, sr
     local actv = active and 1 or 0
     MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ? WHERE id = ?', { actv, bankId })
     TriggerClientEvent('Feather:Banks:Refresh', -1)
-    local adminUser = VORPcore.getUser(src)
-    local adminId = adminUser and adminUser.getUsedCharacter and adminUser.getUsedCharacter.charIdentifier or 'Unknown'
+    local adminUser = GetBankingContext(src)
+    local adminId = adminUser and adminUser.characterId or 'Unknown'
     local lines = {
         '**Action:** `Bank Hours Toggled`',
         '**Bank:** `' .. tostring(BccBanksInternal.getBankName(bankId)) .. '`',
         '**Hours Active:** `' .. tostring(active) .. '`',
         '**Admin:** `' .. tostring(BccBanksInternal.getCharacterNameById(adminId)) .. ' (' .. tostring(adminId) .. ')`',
     }
-    SendBankDiscordLog('Bank Hours Toggled', lines, 3447003)
+    QueueBankAuditLog('Bank Hours Toggled', lines, 3447003)
     cb(true)
 end)

@@ -9,24 +9,24 @@ local function isNearAccountBank(src, accountId)
     return account and IsPlayerNearBank(src, account.bank_id)
 end
 
-BccUtils.RPC:Register('Feather:Banks:GetAccounts', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetAccounts', function(params, cb, src)
     devPrint("GetAccounts RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint("GetAccounts: Character not found (no user).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint("GetAccounts: Character not found (no used character).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local bankId = NormalizeId(params and params.bank)
 
     devPrint("Parsed bankId:", bankId, "characterId:", characterId)
@@ -73,7 +73,7 @@ BccUtils.RPC:Register('Feather:Banks:GetAccounts', function(params, cb, src)
 end)
 
 -- Public: list all accounts for a bank (minimal fields)
-BccUtils.RPC:Register('Feather:Banks:ListAccountsByBank', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:ListAccountsByBank', function(params, cb, src)
     local bankId = NormalizeId(params and params.bank)
     devPrint('ListAccountsByBank RPC called. src=', src, 'bank=', bankId)
     if not bankId then
@@ -99,24 +99,24 @@ BccUtils.RPC:Register('Feather:Banks:ListAccountsByBank', function(params, cb, s
     cb(true, rows or {})
 end)
 
-BccUtils.RPC:Register('Feather:Banks:CreateAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:CreateAccount', function(params, cb, src)
     devPrint("CreateAccount RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint("CreateAccount: Character not found (no user).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint("CreateAccount: Character not found (no used character).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local name = params and params.name
     local bank = NormalizeId(params and params.bank)
 
@@ -173,15 +173,15 @@ BccUtils.RPC:Register('Feather:Banks:CreateAccount', function(params, cb, src)
         '**Account Number:** `' .. tostring(createdAccount and createdAccount.account_number or 'Pending') .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Account Created', lines, 5763719)
+    QueueBankAuditLog('Bank Account Created', lines, 5763719)
     NotifyClient(src, _U('success_account_created'), "success", 4000)
     cb(true, out)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:CloseAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:CloseAccount', function(params, cb, src)
     devPrint("CloseAccount RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint("CloseAccount: Character not found (no user).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
@@ -189,7 +189,7 @@ BccUtils.RPC:Register('Feather:Banks:CloseAccount', function(params, cb, src)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint("CloseAccount: Character not found (no used character).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
@@ -197,7 +197,7 @@ BccUtils.RPC:Register('Feather:Banks:CloseAccount', function(params, cb, src)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local bank = NormalizeId(params and params.bank)
     local account = NormalizeId(params and params.account)
 
@@ -243,15 +243,15 @@ BccUtils.RPC:Register('Feather:Banks:CloseAccount', function(params, cb, src)
         '**Bank:** `' .. tostring(BccBanksInternal.getBankName(bank)) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Account Closed', lines, 15158332)
+    QueueBankAuditLog('Bank Account Closed', lines, 15158332)
     NotifyClient(src, _U('success_account_closed'), "success", 4000)
     cb(true, out)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetAccount', function(params, cb, src)
     devPrint("GetAccount RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint("GetAccount: Character not found (no user).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
@@ -259,7 +259,7 @@ BccUtils.RPC:Register('Feather:Banks:GetAccount', function(params, cb, src)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint("GetAccount: Character not found (no used character).")
         NotifyClient(src, _U('error_character_not_found'), "error", 4000)
@@ -267,7 +267,7 @@ BccUtils.RPC:Register('Feather:Banks:GetAccount', function(params, cb, src)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local accId = NormalizeId(params and params.account)
     local lockAccount = params and params.lockAccount
 
@@ -332,7 +332,7 @@ BccUtils.RPC:Register('Feather:Banks:GetAccount', function(params, cb, src)
     cb(true, { account = accountData, transactions = txData or {} })
 end)
 
-BccUtils.RPC:Register('Feather:Banks:UnlockAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:UnlockAccount', function(params, cb, src)
     devPrint("UnlockAccount RPC called. src=", src, "params=", params)
 
     local accId = NormalizeId(params and params.account)
@@ -354,7 +354,7 @@ BccUtils.RPC:Register('Feather:Banks:UnlockAccount', function(params, cb, src)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetAccountAccessList', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetAccountAccessList', function(params, cb, src)
     devPrint("GetAccountAccessList RPC called. src=", src, "params=", params)
 
     local account = NormalizeId(params and params.account)
@@ -368,9 +368,9 @@ BccUtils.RPC:Register('Feather:Banks:GetAccountAccessList', function(params, cb,
         return
     end
 
-    local user = VORPcore.getUser(src)
-    local char = user and user.getUsedCharacter
-    local requesterId = char and char.charIdentifier
+    local user = GetBankingContext(src)
+    local char = user
+    local requesterId = char and char.characterId
     if not requesterId or not (IsAccountOwner(account, requesterId) or IsAccountAdmin(account, requesterId)) then
         NotifyClient(src, _U('error_no_permission'), 'error', 4000)
         cb(false)
@@ -388,11 +388,9 @@ BccUtils.RPC:Register('Feather:Banks:GetAccountAccessList', function(params, cb,
     devPrint("Raw DB access rows:", json.encode(rawAccessList))
 
     for _, row in ipairs(rawAccessList or {}) do
-        -- Resolve names from DB by VORP charidentifier, independent of online status
-        local nameRow = MySQL.query.await('SELECT firstname, lastname FROM characters WHERE charidentifier = ? LIMIT 1', { row.character_id })
-        nameRow = nameRow and nameRow[1] or nil
-        local firstName = nameRow and nameRow.firstname or 'Unknown'
-        local lastName  = nameRow and nameRow.lastname or ''
+        local firstName, lastName = GetCharacterName(row.character_id)
+        firstName = firstName or 'Unknown'
+        lastName = lastName or ''
 
         table.insert(accessList, {
             character_id = row.character_id,
@@ -409,17 +407,17 @@ BccUtils.RPC:Register('Feather:Banks:GetAccountAccessList', function(params, cb,
     cb(true, { access = accessList })
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GiveAccountAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(params, cb, src)
     devPrint("GiveAccountAccess RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("GiveAccountAccess: requester not found")
         NotifyClient(src, _U('error_invalid_data_provided'), "error", 4000)
         cb(false)
         return
     end
-    local requesterId = user.getUsedCharacter.charIdentifier
+    local requesterId = user.characterId
     local account    = NormalizeId(params and params.account)
     local firstName  = tostring((params and params.first_name) or ''):match('^%s*(.-)%s*$')
     local lastName   = tostring((params and params.last_name)  or ''):match('^%s*(.-)%s*$')
@@ -466,15 +464,6 @@ BccUtils.RPC:Register('Feather:Banks:GiveAccountAccess', function(params, cb, sr
         return
     end]]--
 
-    -- Check if target character actually exists in the DB
-    --[[local exists = MySQL.query.await("SELECT 1 FROM characters WHERE charidentifier = ? LIMIT 1", { otherCharacter })
-    if not exists or not exists[1] then
-        devPrint("GiveAccountAccess: Target character not found in DB →", otherCharacter)
-        NotifyClient(src, _U('error_target_character_not_found'), "error", 4000)
-        cb(false)
-        return
-    end]]--
-
     local result = GiveAccountAccess(account, otherCharacter, level)
     devPrint("GiveAccountAccess result:", result)
 
@@ -496,23 +485,23 @@ BccUtils.RPC:Register('Feather:Banks:GiveAccountAccess', function(params, cb, sr
         '**Access Level:** `' .. tostring(level) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Account Access Granted', lines, 5763719)
+    QueueBankAuditLog('Bank Account Access Granted', lines, 5763719)
     NotifyClient(src, _U('success_access_granted'), "success", 4000)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:RemoveAccountAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:RemoveAccountAccess', function(params, cb, src)
     devPrint("RemoveAccountAccess RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("RemoveAccountAccess: requester not found")
         NotifyClient(src, _U('error_invalid_input'), "error", 4000)
         NotifyClient(src, _U('error_invalid_input'), 'error', 4000)
         cb(false)
         return
     end
-    local requesterId = user.getUsedCharacter.charIdentifier
+    local requesterId = user.characterId
 
     local account = NormalizeId(params and params.account)
     local target = tonumber(params and params.character)
@@ -566,21 +555,21 @@ BccUtils.RPC:Register('Feather:Banks:RemoveAccountAccess', function(params, cb, 
         '**Target Char ID:** `' .. tostring(target) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Account Access Removed', lines, 15158332)
+    QueueBankAuditLog('Bank Account Access Removed', lines, 15158332)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:DepositCash', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:DepositCash', function(params, cb, src)
     devPrint("DepositCash RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("DepositCash: invalid player/char.")
         NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
 
     local account        = NormalizeId(params and params.account)
     local amount         = tonumber(params and params.amount)
@@ -589,7 +578,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositCash', function(params, cb, src)
 
     devPrint("DepositCash inputs -> account:", account, "amount:", amount, "currentDollars:", currentDollars)
 
-    local accessLevel = GetAccountAccess(account, char.charIdentifier)
+    local accessLevel = GetAccountAccess(account, char.characterId)
     devPrint("DepositCash: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Deposit then
@@ -621,7 +610,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositCash', function(params, cb, src)
         cb(false)
         return
     end
-    local removed = pcall(function() char.removeCurrency(0, amount) end)
+    local removed = pcall(function() char.DebitWallet(0, amount) end)
     if not removed then
         ReleasePlayerFinancialLock(src)
         NotifyClient(src, _U('error_unable_deposit_cash'), "error", 4000)
@@ -629,7 +618,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositCash', function(params, cb, src)
         return
     end
     if not DepositCash(account, amount) then
-        pcall(function() char.addCurrency(0, amount) end)
+        pcall(function() char.CreditWallet(0, amount) end)
         ReleasePlayerFinancialLock(src)
         devPrint("DepositCash: DB update failed.")
         NotifyClient(src, _U('error_unable_deposit_cash') or 'Unable to deposit cash at this time.', "error", 4000)
@@ -637,7 +626,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositCash', function(params, cb, src)
         return
     end
     ReleasePlayerFinancialLock(src)
-    AddAccountTransaction(account, char.charIdentifier, amount, 'deposit - cash', description)
+    AddAccountTransaction(account, char.characterId, amount, 'deposit - cash', description)
 
     devPrint("DepositCash: success. account=", account, "amount=", amount)
     local accountRow = BccBanksInternal.getAccountSummary(account)
@@ -650,23 +639,23 @@ BccUtils.RPC:Register('Feather:Banks:DepositCash', function(params, cb, src)
         '**Description:** `' .. tostring(description) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Cash Deposit', lines, 3066993)
+    QueueBankAuditLog('Bank Cash Deposit', lines, 3066993)
     NotifyClient(src, _U('success_deposit_cash', tostring(amount)) or ('Successfully deposited $' .. tostring(amount)), "success", 4000)
     cb(true)
 end)
 
 -- Deposit Gold
-BccUtils.RPC:Register('Feather:Banks:DepositGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:DepositGold', function(params, cb, src)
     devPrint("DepositGold RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("DepositGold: invalid player/char.")
         NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
 
     local account     = NormalizeId(params and params.account)
     local amount      = tonumber(params and params.amount)
@@ -675,7 +664,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositGold', function(params, cb, src)
 
     devPrint("DepositGold inputs -> account:", account, "amount:", amount, "currentGold:", currentGold)
 
-    local accessLevel = GetAccountAccess(account, char.charIdentifier)
+    local accessLevel = GetAccountAccess(account, char.characterId)
     devPrint("DepositGold: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Deposit then
@@ -707,7 +696,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositGold', function(params, cb, src)
         cb(false)
         return
     end
-    local removed = pcall(function() char.removeCurrency(1, amount) end)
+    local removed = pcall(function() char.DebitWallet(1, amount) end)
     if not removed then
         ReleasePlayerFinancialLock(src)
         NotifyClient(src, _U('error_unable_deposit_gold'), "error", 4000)
@@ -715,7 +704,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositGold', function(params, cb, src)
         return
     end
     if not DepositGold(account, amount) then
-        pcall(function() char.addCurrency(1, amount) end)
+        pcall(function() char.CreditWallet(1, amount) end)
         ReleasePlayerFinancialLock(src)
         devPrint("DepositGold: DB update failed.")
         NotifyClient(src, _U('error_unable_deposit_gold'), "error", 4000)
@@ -723,7 +712,7 @@ BccUtils.RPC:Register('Feather:Banks:DepositGold', function(params, cb, src)
         return
     end
     ReleasePlayerFinancialLock(src)
-    AddAccountTransaction(account, char.charIdentifier, amount, 'deposit - gold', description)
+    AddAccountTransaction(account, char.characterId, amount, 'deposit - gold', description)
 
     devPrint("DepositGold: success. account=", account, "amount=", amount)
     local accountRow = BccBanksInternal.getAccountSummary(account)
@@ -736,22 +725,22 @@ BccUtils.RPC:Register('Feather:Banks:DepositGold', function(params, cb, src)
         '**Description:** `' .. tostring(description) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Gold Deposit', lines, 15844367)
+    QueueBankAuditLog('Bank Gold Deposit', lines, 15844367)
     NotifyClient(src, _U('success_deposit_gold', tostring(amount)), "success", 4000)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:WithdrawCash', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawCash', function(params, cb, src)
     devPrint("WithdrawCash RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("WithdrawCash: invalid player/char.")
         NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
 
     local account     = NormalizeId(params and params.account)
     local amount      = tonumber(params and params.amount)
@@ -759,7 +748,7 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawCash', function(params, cb, src)
 
     devPrint("WithdrawCash inputs -> account:", account, "amount:", amount)
 
-    local accessLevel = GetAccountAccess(account, char.charIdentifier)
+    local accessLevel = GetAccountAccess(account, char.characterId)
     devPrint("WithdrawCash: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Withdraw_Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Withdraw_Deposit then
@@ -800,7 +789,7 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawCash', function(params, cb, src)
         cb(false)
         return
     end
-    local credited = pcall(function() char.addCurrency(0, amount) end)
+    local credited = pcall(function() char.CreditWallet(0, amount) end)
     if not credited then
         DepositCash(account, amount)
         ReleasePlayerFinancialLock(src)
@@ -809,7 +798,7 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawCash', function(params, cb, src)
         return
     end
     ReleasePlayerFinancialLock(src)
-    AddAccountTransaction(account, char.charIdentifier, amount, 'withdraw - cash', description)
+    AddAccountTransaction(account, char.characterId, amount, 'withdraw - cash', description)
 
     devPrint("WithdrawCash: success. account=", account, "amount=", amount)
     local accountRow = BccBanksInternal.getAccountSummary(account)
@@ -822,22 +811,22 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawCash', function(params, cb, src)
         '**Description:** `' .. tostring(description) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Cash Withdrawal', lines, 15105570)
+    QueueBankAuditLog('Bank Cash Withdrawal', lines, 15105570)
     NotifyClient(src, _U('success_withdraw_cash', tostring(amount)), "success", 4000)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:WithdrawGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawGold', function(params, cb, src)
     devPrint("WithdrawGold RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("WithdrawGold: invalid player/char.")
         NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
 
     local account     = NormalizeId(params and params.account)
     local amount      = tonumber(params and params.amount)
@@ -845,7 +834,7 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawGold', function(params, cb, src)
 
     devPrint("WithdrawGold inputs -> account:", account, "amount:", amount)
 
-    local accessLevel = GetAccountAccess(account, char.charIdentifier)
+    local accessLevel = GetAccountAccess(account, char.characterId)
     devPrint("WithdrawGold: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Withdraw_Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Withdraw_Deposit then
@@ -886,7 +875,7 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawGold', function(params, cb, src)
         cb(false)
         return
     end
-    local credited = pcall(function() char.addCurrency(1, amount) end)
+    local credited = pcall(function() char.CreditWallet(1, amount) end)
     if not credited then
         DepositGold(account, amount)
         ReleasePlayerFinancialLock(src)
@@ -895,7 +884,7 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawGold', function(params, cb, src)
         return
     end
     ReleasePlayerFinancialLock(src)
-    AddAccountTransaction(account, char.charIdentifier, amount, 'withdraw - gold', description)
+    AddAccountTransaction(account, char.characterId, amount, 'withdraw - gold', description)
 
     devPrint("WithdrawGold: success. account=", account, "amount=", amount)
     local accountRow = BccBanksInternal.getAccountSummary(account)
@@ -908,13 +897,13 @@ BccUtils.RPC:Register('Feather:Banks:WithdrawGold', function(params, cb, src)
         '**Description:** `' .. tostring(description) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Gold Withdrawal', lines, 15105570)
+    QueueBankAuditLog('Bank Gold Withdrawal', lines, 15105570)
     NotifyClient(src, _U('success_withdraw_gold', tostring(amount)), "success", 4000)
     cb(true)
 end)
 
 -- Transfer Cash between accounts (applies fee when banks differ)
-BccUtils.RPC:Register('Feather:Banks:TransferCash', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(params, cb, src)
     devPrint("TransferCash RPC called. src=", src, "params=", params)
 
     if not (Config.Transfer and Config.Transfer.Enabled) then
@@ -923,14 +912,14 @@ BccUtils.RPC:Register('Feather:Banks:TransferCash', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("TransferCash: invalid player/char.")
         NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
 
     local fromAccountId = NormalizeId(params and params.fromAccount)
     local toAccountNumber = params and params.toAccountNumber
@@ -952,8 +941,8 @@ BccUtils.RPC:Register('Feather:Banks:TransferCash', function(params, cb, src)
         return
     end
 
-    local accessLevel = GetAccountAccess(fromAccountId, char.charIdentifier)
-    devPrint("Access level for fromAccount:", fromAccountId, "char:", char.charIdentifier, "=", accessLevel)
+    local accessLevel = GetAccountAccess(fromAccountId, char.characterId)
+    devPrint("Access level for fromAccount:", fromAccountId, "char:", char.characterId, "=", accessLevel)
     if not accessLevel or accessLevel > Config.AccessLevels.Withdraw_Deposit then
         NotifyClient(src, _U('error_no_withdraw_permission'), 'error', 4000)
         cb(false)
@@ -1039,11 +1028,11 @@ BccUtils.RPC:Register('Feather:Banks:TransferCash', function(params, cb, src)
     local fromSuffix = tostring(fromAcc.account_number or '')
     fromSuffix = string.sub(fromSuffix, #fromSuffix - 5, #fromSuffix)
 
-    AddAccountTransaction(fromAcc.id, char.charIdentifier, amount, 'transfer - out', description .. ' -> ' .. tostring(toSuffix))
+    AddAccountTransaction(fromAcc.id, char.characterId, amount, 'transfer - out', description .. ' -> ' .. tostring(toSuffix))
     if fee > 0 then
-        AddAccountTransaction(fromAcc.id, char.charIdentifier, fee, 'transfer - fee', 'Cross-bank fee (' .. tostring(feePercent) .. '%)')
+        AddAccountTransaction(fromAcc.id, char.characterId, fee, 'transfer - fee', 'Cross-bank fee (' .. tostring(feePercent) .. '%)')
     end
-    AddAccountTransaction(toAcc.id, char.charIdentifier, amount, 'transfer - in', description .. ' <- ' .. tostring(fromSuffix))
+    AddAccountTransaction(toAcc.id, char.characterId, amount, 'transfer - in', description .. ' <- ' .. tostring(fromSuffix))
 
     devPrint("Transfer completed. from:", fromAcc.id, "to:", toAcc.id, "amount:", amount, "fee:", fee)
     local lines = {
@@ -1057,7 +1046,7 @@ BccUtils.RPC:Register('Feather:Banks:TransferCash', function(params, cb, src)
         '**Description:** `' .. tostring(description) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Bank Transfer Completed', lines, 3447003)
+    QueueBankAuditLog('Bank Transfer Completed', lines, 3447003)
     NotifyClient(src, _U('success_transfer', tostring(amount)), 'success', 4000)
     cb(true, { fee = fee, debited = totalDebit })
 end)

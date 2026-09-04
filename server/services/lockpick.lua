@@ -3,12 +3,8 @@ local function hasLockpickItem(src)
     return true
   end
   local item = Config.LockPicking.ItemName or 'lockpick'
-  local count = 0
-  local ok = pcall(function()
-    count = exports.vorp_inventory:getItemCount(src, nil, item, {}) or 0
-  end)
-  if not ok then return false end
-  return (tonumber(count) or 0) > 0
+  local result = exports['feather-inventory'].initiate().Items.GetItemCount(item, src)
+  return type(result) == 'table' and result.ok == true and (tonumber(result.value) or 0) > 0
 end
 
 local authorizedAttempts = {}
@@ -76,37 +72,26 @@ RegisterNetEvent('feather-banks:lockpick:onFail', function()
   local dur = (cfg and cfg.Durability) or {}
 
   if dur.Enabled then
-    local ok, item = pcall(function()
-      return exports.vorp_inventory:getItem(src, itemName)
-    end)
-    if not ok or not item or not item.id then
-      return -- nothing to do
-    end
-
-    local maxD = tonumber(dur.Max or 100) or 100
     local damage = tonumber(dur.DamageOnFail or 10) or 10
-    local current = (item.metadata and item.metadata.durability) or maxD
-    local newVal = (tonumber(current) or maxD) - damage
-
-    if newVal <= 0 then
-      -- remove this specific item instance
-      pcall(function()
-        exports.vorp_inventory:subItemID(src, item.id)
-      end)
-    else
-      local newMeta = {
-        description = string.format('Durabilitate = %d%%', newVal),
-        durability = newVal,
-        id = item.id
-      }
-      pcall(function()
-        exports.vorp_inventory:setItemMetadata(src, item.id, newMeta, 1)
-      end)
+    local inventory = exports['feather-inventory'].initiate()
+    local session = exports['feather-core']:GetSessionContext(src)
+    if type(session) ~= 'table' or session.ok ~= true or not session.value.characterId then return end
+    local characterInventory = inventory.Inventory.GetCharacterInventory(session.value.characterId)
+    if type(characterInventory) ~= 'table' or characterInventory.ok ~= true then return end
+    local items = inventory.Inventory.GetInventoryItems(characterInventory.value.id)
+    if type(items) ~= 'table' or items.ok ~= true then return end
+    local instance
+    for _, candidate in ipairs(items.value or {}) do
+      if candidate.name == itemName then instance = candidate break end
+    end
+    if not instance or not instance.id then return end
+    local adjusted = inventory.Items.AdjustCondition(instance.id, -damage)
+    local remainingCondition = type(adjusted) == 'table' and adjusted.ok == true
+      and tonumber(adjusted.value and adjusted.value.condition) or nil
+    if remainingCondition and remainingCondition <= 0 then
+      inventory.Items.RemoveItemById(instance.id)
     end
   elseif (dur.DestroyOnFailIfDisabled == true) then
-    -- fallback remove one
-    pcall(function()
-      exports.vorp_inventory:subItem(src, itemName, 1)
-    end)
+    exports['feather-inventory'].initiate().Items.RemoveItemByName(itemName, 1, src)
   end
 end)

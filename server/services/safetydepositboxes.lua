@@ -3,22 +3,22 @@ local function getSDBBankId(sdbId)
     return row and row.bank_id or nil
 end
 
-BccUtils.RPC:Register('Feather:Banks:GetSDBs', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBs', function(params, cb, src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint('GetSDBs: no user for src', src)
         NotifyClient(src, _U('error_invalid_character_or_bank'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint('GetSDBs: no character for src', src)
         NotifyClient(src, _U('error_invalid_character_or_bank'), 'error', 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local bankId = NormalizeId(params and params.bank)
 
     if not characterId or not bankId then
@@ -48,14 +48,14 @@ BccUtils.RPC:Register('Feather:Banks:GetSDBs', function(params, cb, src)
     cb(true, rows or {})
 end)
 
-BccUtils.RPC:Register('Feather:Banks:CreateSDB', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, cb, src)
+    local user = GetBankingContext(src)
     if not user then NotifyClient(src, _U('error_invalid_data'), 'error', 4000) return cb(false) end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then NotifyClient(src, _U('error_invalid_data'), 'error', 4000) return cb(false) end
 
     -- inputs
-    local characterId = char.charIdentifier          -- adjust if your framework uses a different name
+    local characterId = char.characterId          -- adjust if your framework uses a different name
     local name        = params and params.name
     local bank        = NormalizeId(params and params.bank)
     local sizeKey     = params and params.size
@@ -94,7 +94,7 @@ BccUtils.RPC:Register('Feather:Banks:CreateSDB', function(params, cb, src)
         return cb(false)
     end
 
-    -- check balance using VORP character fields
+    -- check balance using Feather character profile
     local balance = (currencyId == 0) and tonumber(char.money) or tonumber(char.gold)
     if not balance or balance < price then
         if currencyId == 0 then
@@ -112,7 +112,7 @@ BccUtils.RPC:Register('Feather:Banks:CreateSDB', function(params, cb, src)
     -- try to charge first so we don't create resources the player can't pay for
     local charged = false
     local chargeOk, chargeErr = pcall(function()
-        char.removeCurrency(currencyId, price)
+        char.DebitWallet(currencyId, price)
         charged = true
     end)
     if not chargeOk then
@@ -126,7 +126,7 @@ BccUtils.RPC:Register('Feather:Banks:CreateSDB', function(params, cb, src)
     local ok, boxOrErr, szFromCtrl = pcall(CreateSDB, name, characterId, bank, resolvedKey)
     if not ok or boxOrErr == false then
         -- refund if DB failed
-        if charged then pcall(function() if char.addCurrency then char.addCurrency(currencyId, price) end end) end
+        if charged then pcall(function() if char.CreditWallet then char.CreditWallet(currencyId, price) end end) end
         devPrint("CreateSDB DB failed:", tostring(ok and (szFromCtrl or "unknown") or boxOrErr))
         NotifyClient(src, _U('error_unable_create_sdb'), 'error', 4000)
         ReleasePlayerFinancialLock(src)
@@ -136,31 +136,30 @@ BccUtils.RPC:Register('Feather:Banks:CreateSDB', function(params, cb, src)
     local szCfg = szFromCtrl or sz
 
     -- register inventory & grant access
-    local invId   = 'sdb_' .. tostring(box.id)
-    local invName = 'SDB #' .. tostring(box.id)
+    local invName = tostring(name)
     local restrictedItems  = (szCfg.BlacklistItems and #szCfg.BlacklistItems or 0) > 0 and szCfg.BlacklistItems or nil
     local ignoreItemLimits = (szCfg.IgnoreItemLimit == true)
 
     local invOk, invErr = pcall(function()
-        exports.vorp_inventory:registerInventory({
-            id = invId,
-            name = invName,
-            limit = tonumber(szCfg.MaxWeight) or 100,
-            acceptWeapons = true,
-            shared = true,
-            ignoreItemStackLimit = ignoreItemLimits,
-            whitelistItems = false,
-            UsePermissions = false,
-            UseBlackList = restrictedItems ~= nil,
-            whitelistWeapons = false,
-        })
-        if restrictedItems then
-            for _, itemName in ipairs(restrictedItems) do
-                exports.vorp_inventory:BlackListCustomAny(invId, itemName)
-            end
+        local inventory = exports['feather-inventory'].initiate()
+        local foreignKey = inventory.Inventory.RegisterForeignKey(
+            'bcc_safety_deposit_boxes',
+            'VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci', 'id')
+        if type(foreignKey) ~= 'table' or foreignKey.ok ~= true then
+            local failure = type(foreignKey) == 'table' and foreignKey.error or nil
+            error(failure and (failure.message or failure.code) or 'Feather Inventory foreign-key registration failed')
+        end
+        local registered = inventory.Inventory.RegisterInventory(
+            'bcc_safety_deposit_boxes', box.id, invName, ignoreItemLimits,
+            tonumber(szCfg.MaxWeight) or 100, restrictedItems, tostring(characterId), false,
+            tonumber(szCfg.MaxSlots)
+        )
+        if type(registered) ~= 'table' or registered.ok ~= true then
+            local failure = type(registered) == 'table' and registered.error or nil
+            error(failure and (failure.message or failure.code) or 'Feather Inventory container registration failed')
         end
 
-        MySQL.update.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { invId, box.id })
+        MySQL.update.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { registered.value.uuid, box.id })
         MySQL.insert.await(
             'INSERT INTO `bcc_safety_deposit_boxes_access` (`safety_deposit_box_id`, `character_id`, `level`) VALUES (?,?,?)',
             { box.id, characterId, Config.AccessLevels.Admin }
@@ -172,7 +171,7 @@ BccUtils.RPC:Register('Feather:Banks:CreateSDB', function(params, cb, src)
         pcall(function()
             MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', { box.id })
             MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', { box.id })
-            if charged and char.addCurrency then char.addCurrency(currencyId, price) end
+            if charged and char.CreditWallet then char.CreditWallet(currencyId, price) end
         end)
         devPrint("CreateSDB: inventory registration failed:", tostring(invErr))
         NotifyClient(src, _U('error_unable_create_sdb'), 'error', 4000)
@@ -192,9 +191,20 @@ BccUtils.RPC:Register('Feather:Banks:CreateSDB', function(params, cb, src)
         '**Price:** `' .. tostring(price) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Safety Deposit Box Created', lines, 5763719)
+    QueueBankAuditLog('Safety Deposit Box Created', lines, 5763719)
     AddCharacterTransaction(characterId, price, 'sdb - created', 'Created SDB #' .. tostring(box.id) .. ' at ' .. tostring(BccBanksInternal.getBankName(bank)) .. ' paid with ' .. tostring(payWith))
     cb(true, box)
+end)
+
+AddEventHandler('Feather:Banks:DatabaseReady', function()
+    local registered = exports['feather-inventory'].initiate().Inventory.RegisterForeignKey(
+        'bcc_safety_deposit_boxes',
+        'VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci', 'id')
+    if type(registered) ~= 'table' or registered.ok ~= true then
+        local failure = type(registered) == 'table' and registered.error or nil
+        error(('[bcc-banks] Feather Inventory SDB registration failed: %s'):format(
+            tostring(failure and (failure.message or failure.code) or 'invalid result')))
+    end
 end)
 
 local function resolveSDBSizeConfig(sizeKey)
@@ -213,40 +223,30 @@ local function resolveSDBSizeConfig(sizeKey)
 end
 
 local function ensureSDBInventoryRegistered(boxId, inventoryId, displayName, sizeKey)
-    local invId = inventoryId
-    if not invId or invId == '' then
-        invId = 'sdb_' .. tostring(boxId)
-    end
-
-    local invName = (displayName and displayName ~= '') and displayName or ('SDB #' .. tostring(boxId))
+    local invName = (displayName and displayName ~= '') and tostring(displayName) or 'Safety Deposit Box'
     local sizeCfg = resolveSDBSizeConfig(sizeKey)
     local ignoreStacks = sizeCfg and sizeCfg.IgnoreItemLimit == true
     local blacklist = (sizeCfg and sizeCfg.BlacklistItems and #sizeCfg.BlacklistItems > 0) and sizeCfg.BlacklistItems or nil
     local limit = tonumber(sizeCfg and sizeCfg.MaxWeight) or 100
 
-    local isRegistered = exports.vorp_inventory:isCustomInventoryRegistered(invId)
-    if not isRegistered then
-        exports.vorp_inventory:registerInventory({
-            id = invId,
-            name = invName,
-            limit = limit,
-            acceptWeapons = true,
-            shared = true,
-            ignoreItemStackLimit = ignoreStacks,
-            whitelistItems = false,
-            UsePermissions = false,
-            UseBlackList = blacklist ~= nil,
-            whitelistWeapons = false,
-        })
-
-        if blacklist then
-            for _, itemName in ipairs(blacklist) do
-                exports.vorp_inventory:BlackListCustomAny(invId, itemName)
-            end
-        end
+    local owner = MySQL.scalar.await('SELECT `owner_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1', { boxId })
+    local inventory = exports['feather-inventory'].initiate()
+    local foreignKey = inventory.Inventory.RegisterForeignKey(
+        'bcc_safety_deposit_boxes',
+        'VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci', 'id')
+    if type(foreignKey) ~= 'table' or foreignKey.ok ~= true then
+        local failure = type(foreignKey) == 'table' and foreignKey.error or nil
+        error(failure and (failure.message or failure.code) or 'Feather Inventory foreign-key registration failed')
     end
-
-    return invId, invName, sizeCfg
+    local registered = inventory.Inventory.RegisterInventory(
+        'bcc_safety_deposit_boxes', boxId, invName, ignoreStacks, limit, blacklist,
+        owner and tostring(owner) or nil, false, tonumber(sizeCfg and sizeCfg.MaxSlots)
+    )
+    if type(registered) ~= 'table' or registered.ok ~= true then
+        local failure = type(registered) == 'table' and registered.error or nil
+        error(failure and (failure.message or failure.code) or 'Feather Inventory container registration failed')
+    end
+    return registered.value.uuid, registered.value.id, invName, sizeCfg
 end
 
 local function countInventoryRows(rows)
@@ -259,43 +259,37 @@ local function countInventoryRows(rows)
 end
 
 local function getSDBInventoryContentCounts(sdbId, inventoryId, displayName, sizeKey)
-    local invId = ensureSDBInventoryRegistered(sdbId, inventoryId, displayName, sizeKey)
+    local invUuid, invId = ensureSDBInventoryRegistered(sdbId, inventoryId, displayName, sizeKey)
     local itemCount = 0
     local weaponCount = 0
 
     local itemsOk, items = pcall(function()
-        return exports.vorp_inventory:getCustomInventoryItems(invId)
+        local result = exports['feather-inventory'].initiate().Inventory.GetInventoryItems(invId)
+        return type(result) == 'table' and result.ok == true and result.value or {}
     end)
     if itemsOk then
         itemCount = countInventoryRows(items)
     end
 
-    local weaponsOk, weapons = pcall(function()
-        return exports.vorp_inventory:getCustomInventoryWeapons(invId)
-    end)
-    if weaponsOk then
-        weaponCount = countInventoryRows(weapons)
-    end
-
-    return invId, itemCount, weaponCount
+    return invUuid, itemCount, weaponCount
 end
 
-BccUtils.RPC:Register('Feather:Banks:OpenSDB', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+exports['feather-core']:RegisterRPC('Feather:Banks:OpenSDB', function(params, cb, src)
+    local user = GetBankingContext(src)
     if not user then
         devPrint('OpenSDB: no user for src', src)
         NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         devPrint('OpenSDB: no character for src', src)
         NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local sdbId = NormalizeId(params and params.sdb_id)
 
     if not characterId or not sdbId then
@@ -329,32 +323,32 @@ BccUtils.RPC:Register('Feather:Banks:OpenSDB', function(params, cb, src)
         return
     end
 
-    local invId, invName = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
-    if not row.inventory_id or row.inventory_id ~= invId then
-        MySQL.query.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { invId, sdbId })
-        row.inventory_id = invId
+    local invUuid, invId = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
+    if not row.inventory_id or row.inventory_id ~= invUuid then
+        MySQL.query.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { invUuid, sdbId })
+        row.inventory_id = invUuid
     end
 
-    local invIdStr = tostring(invId)
-    devPrint('OpenSDB: attempting openInventory for', invId, 'src=', src)
-    Wait(100)
-    -- Proactively close any current inventory to avoid conflicts
-    --[[pcall(function() exports.vorp_inventory:closeInventory(src) end)
-    local ok, err = pcall(function()
-        exports.vorp_inventory:openInventory(src, invId)
-    end)]]--
-    --[[if not ok then
-        devPrint('OpenSDB: openInventory error:', tostring(err))
+    devPrint('OpenSDB: attempting Feather Inventory open for', invUuid, 'src=', src)
+    local temporary = exports['feather-inventory'].initiate().Inventory.GrantTemporaryAccess(src, invId, 60)
+    if type(temporary) ~= 'table' or temporary.ok ~= true then
+        devPrint('OpenSDB: Feather Inventory access failed:',
+            tostring(type(temporary) == 'table' and (temporary.message or temporary.code) or 'invalid result'))
+        NotifyClient(src, _U('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
+        return cb(false)
+    end
+    local opened = exports['feather-inventory'].initiate().Inventory.OpenInventory(src, invUuid, 'safety_deposit_box')
+    if type(opened) ~= 'table' or opened.ok ~= true then
+        devPrint('OpenSDB: Feather Inventory error:',
+            tostring(type(opened) == 'table' and (opened.message or opened.code) or 'invalid result'))
         NotifyClient(src, _U('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
         cb(false)
         return
-    end]]--
-    devPrint("[OpenInv] Opening " .. invIdStr .. " for src " .. tostring(src))
-    exports.vorp_inventory:openInventory(src, invIdStr)
+    end
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:Admin:OpenSDB', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:OpenSDB', function(params, cb, src)
     if not IsBankAdmin or not IsBankAdmin(src) then
         NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
@@ -379,27 +373,30 @@ BccUtils.RPC:Register('Feather:Banks:Admin:OpenSDB', function(params, cb, src)
         return
     end
 
-    local invId, _ = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
-    if not row.inventory_id or row.inventory_id ~= invId then
-        MySQL.query.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { invId, sdbId })
+    local invUuid, invId = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
+    if not row.inventory_id or row.inventory_id ~= invUuid then
+        MySQL.query.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { invUuid, sdbId })
     end
-    exports.vorp_inventory:openInventory(src, tostring(invId))
+    local temporary = exports['feather-inventory'].initiate().Inventory.GrantTemporaryAccess(src, invId, 60)
+    if type(temporary) ~= 'table' or temporary.ok ~= true then return cb(false) end
+    local opened = exports['feather-inventory'].initiate().Inventory.OpenInventory(src, invUuid, 'safety_deposit_box_admin')
+    if type(opened) ~= 'table' or opened.ok ~= true then return cb(false) end
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetSDBDeleteInfo', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBDeleteInfo', function(params, cb, src)
+    local user = GetBankingContext(src)
     if not user then
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         cb(false)
         return
     end
 
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local sdbId = NormalizeId(params and params.sdb_id)
     if not characterId or not sdbId then
         cb(false)
@@ -433,21 +430,21 @@ BccUtils.RPC:Register('Feather:Banks:GetSDBDeleteInfo', function(params, cb, src
     })
 end)
 
-BccUtils.RPC:Register('Feather:Banks:DeleteSDB', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+exports['feather-core']:RegisterRPC('Feather:Banks:DeleteSDB', function(params, cb, src)
+    local user = GetBankingContext(src)
     if not user then
         NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user.getUsedCharacter
+    local char = user
     if not char then
         NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
 
-    local characterId = char.charIdentifier
+    local characterId = char.characterId
     local sdbId = NormalizeId(params and params.sdb_id)
     if not characterId or not sdbId then
         NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
@@ -476,21 +473,16 @@ BccUtils.RPC:Register('Feather:Banks:DeleteSDB', function(params, cb, src)
         return
     end
 
-    local invId = row.inventory_id
-    if not invId or invId == '' then
-        invId = 'sdb_' .. tostring(sdbId)
+    local invUuid, invId = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
+    exports['feather-inventory'].initiate().Inventory.CloseInventory(src)
+    local deleted = exports['feather-inventory'].initiate().Inventory.DeleteContainerIfEmpty(
+        invId, 'bcc_safety_deposit_boxes', 'safety deposit box deleted')
+    if type(deleted) ~= 'table' or deleted.ok ~= true then
+        devPrint('DeleteSDB: Feather Inventory refused deletion:',
+            tostring(type(deleted) == 'table' and (deleted.message or deleted.code) or 'invalid result'))
+        NotifyClient(src, _U('failed_delete_sdb'), 'error', 4000)
+        return cb(false)
     end
-    invId = getSDBInventoryContentCounts(sdbId, invId, row.name, row.size)
-
-    pcall(function()
-        exports.vorp_inventory:closeInventory(src, invId)
-    end)
-    pcall(function()
-        exports.vorp_inventory:deleteCustomInventory(invId)
-    end)
-    pcall(function()
-        exports.vorp_inventory:removeInventory(invId)
-    end)
 
     MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', { sdbId })
     local affected = MySQL.update.await('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', { sdbId })
@@ -508,13 +500,13 @@ BccUtils.RPC:Register('Feather:Banks:DeleteSDB', function(params, cb, src)
         '**Inventory ID:** `' .. tostring(invId) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Safety Deposit Box Deleted', lines, 15158332)
+    QueueBankAuditLog('Safety Deposit Box Deleted', lines, 15158332)
     AddCharacterTransaction(characterId, 0, 'sdb - deleted', 'Deleted SDB #' .. tostring(sdbId) .. ' at ' .. tostring(BccBanksInternal.getBankName(row.bank_id)))
     NotifyClient(src, _U('sdb_deleted_notify'), 'success', 4000)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:GetSDBAccessList', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBAccessList', function(params, cb, src)
     local sdbId = NormalizeId(params and params.sdb_id)
     if not sdbId then
         devPrint("GetSDBAccessList: invalid sdbId", params and params.sdb_id)
@@ -523,9 +515,9 @@ BccUtils.RPC:Register('Feather:Banks:GetSDBAccessList', function(params, cb, src
         return
     end
 
-    local user = VORPcore.getUser(src)
-    local char = user and user.getUsedCharacter
-    local requesterId = char and char.charIdentifier
+    local user = GetBankingContext(src)
+    local char = user
+    local requesterId = char and char.characterId
     if not requesterId or not (IsSDBOwner(sdbId, requesterId) or IsSDBAdmin(sdbId, requesterId)) then
         NotifyClient(src, _U('error_no_permission'), 'error', 4000)
         cb(false)
@@ -543,11 +535,9 @@ BccUtils.RPC:Register('Feather:Banks:GetSDBAccessList', function(params, cb, src
     devPrint("Raw DB access rows:", json.encode(rawAccessList))
 
     for _, row in ipairs(rawAccessList) do
-        -- Resolve names from DB using VORP charidentifier (works for offline characters)
-        local nameRow = MySQL.query.await('SELECT firstname, lastname FROM characters WHERE charidentifier = ? LIMIT 1', { row.character_id })
-        nameRow = nameRow and nameRow[1] or nil
-        local firstName = nameRow and nameRow.firstname or 'Unknown'
-        local lastName  = nameRow and nameRow.lastname or ''
+        local firstName, lastName = GetCharacterName(row.character_id)
+        firstName = firstName or 'Unknown'
+        lastName = lastName or ''
 
         table.insert(accessList, {
             character_id = row.character_id,
@@ -562,10 +552,10 @@ BccUtils.RPC:Register('Feather:Banks:GetSDBAccessList', function(params, cb, src
     cb(true, { access = accessList })
 end)
 
-BccUtils.RPC:Register('Feather:Banks:AddSDBAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(params, cb, src)
     devPrint("AddSDBAccess RPC called. src=", src, "params=", params)
 
-    local user          = VORPcore.getUser(src)
+    local user          = GetBankingContext(src)
     local requesterId
     do
         if not user then
@@ -574,17 +564,17 @@ BccUtils.RPC:Register('Feather:Banks:AddSDBAccess', function(params, cb, src)
             cb(false)
             return
         end
-        local ch = user.getUsedCharacter
+        local ch = user
         if not ch then
             devPrint("AddSDBAccess: requester character not found")
             NotifyClient(src, _U('error_invalid_data_provided'), "error", 4000)
             cb(false)
             return
         end
-        requesterId = ch.charIdentifier
+        requesterId = ch.characterId
     end
     local sdbId     = NormalizeId(params and params.sdb_id)
-    local otherCharId = tonumber(params and params.character) or tonumber(params and params.user_src)
+    local otherCharId = NormalizeId(params and (params.character or params.user_src))
     local firstName = tostring((params and params.first_name) or ''):match('^%s*(.-)%s*$')
     local lastName  = tostring((params and params.last_name)  or ''):match('^%s*(.-)%s*$')
     local level     = tonumber(params and params.level)
@@ -608,11 +598,12 @@ BccUtils.RPC:Register('Feather:Banks:AddSDBAccess', function(params, cb, src)
             cb(false)
             return
         end
-        otherCharId = tonumber(otherCharId)
     else
-        local exists = MySQL.query.await("SELECT 1 FROM characters WHERE charidentifier = ? LIMIT 1", { otherCharId })
-        if not exists or not exists[1] then
-            devPrint("AddSDBAccess: Target character not found in DB ->", otherCharId)
+        local found = exports['feather-core']:GetProvider('character-profile', nil, 1)
+        local provider = found and found.ok == true and found.value and found.value.implementation or nil
+        local profile = provider and provider.GetProfile and provider.GetProfile(tostring(otherCharId)) or nil
+        if not profile or profile.ok ~= true then
+            devPrint("AddSDBAccess: Feather character not found ->", otherCharId)
             NotifyClient(src, _U('error_target_character_not_found'), "error", 4000)
             cb(false)
             return
@@ -672,22 +663,22 @@ BccUtils.RPC:Register('Feather:Banks:AddSDBAccess', function(params, cb, src)
         '**Access Level:** `' .. tostring(level) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Safety Deposit Box Access Granted', lines, 5763719)
+    QueueBankAuditLog('Safety Deposit Box Access Granted', lines, 5763719)
     NotifyClient(src, _U('success_access_granted'), "success", 4000)
     cb(true)
 end)
 
-BccUtils.RPC:Register('Feather:Banks:RemoveSDBAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:RemoveSDBAccess', function(params, cb, src)
     devPrint("RemoveSDBAccess RPC called. src=", src, "params=", params)
 
-    local user = VORPcore.getUser(src)
-    if not user or not user.getUsedCharacter then
+    local user = GetBankingContext(src)
+    if not user then
         devPrint("RemoveSDBAccess: requester not found")
         NotifyClient(src, _U('error_invalid_input'), "error", 4000)
         cb(false)
         return
     end
-    local requesterId = user.getUsedCharacter.charIdentifier
+    local requesterId = user.characterId
 
     local sdbId = NormalizeId(params and params.sdb_id)
     local targetCharId = tonumber(params and params.character)
@@ -736,6 +727,6 @@ BccUtils.RPC:Register('Feather:Banks:RemoveSDBAccess', function(params, cb, src)
         '**Target Char ID:** `' .. tostring(targetCharId) .. '`',
     }
     BccBanksInternal.appendActorLines(lines, src)
-    SendBankDiscordLog('Safety Deposit Box Access Removed', lines, 15158332)
+    QueueBankAuditLog('Safety Deposit Box Access Removed', lines, 15158332)
     cb(true)
 end)

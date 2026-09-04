@@ -52,7 +52,7 @@ local function adminTransactionBadgeColor(txType)
 end
 
 function OpenBankAdminMenu()
-    local ok, allowed = BccUtils.RPC:CallAsync("Feather:Banks:CheckAdmin", {})
+    local ok, allowed = exports['feather-core']:CallRPCAsync("Feather:Banks:CheckAdmin", {})
     if not ok or not allowed then
         Notify(_U("admin_no_permission"), "error", 3500)
         return
@@ -78,7 +78,7 @@ function OpenAdminBankSelectMenu()
         style = {}
     })
 
-    local ok, banks = BccUtils.RPC:CallAsync("Feather:Banks:GetBanks", {})
+    local ok, banks = exports['feather-core']:CallRPCAsync("Feather:Banks:GetBanks", {})
     banks = banks or {}
     if not ok or #banks == 0 then
         Page:RegisterElement("textdisplay", {
@@ -113,7 +113,7 @@ function OpenAdminBankSelectMenu()
             label = _U("confirm_button"),
             style = {}
         }, function()
-            local okC = BccUtils.RPC:CallAsync("Feather:Banks:CreateBank", { name = nameValue })
+            local okC = exports['feather-core']:CallRPCAsync("Feather:Banks:CreateBank", { name = nameValue })
             if okC then
                 OpenAdminBankSelectMenu()
             end
@@ -275,7 +275,7 @@ function OpenAdminHoursMenu(Parent, bank)
     do
         local bankId = NormalizeId(bankIdValue) or (bank and NormalizeId(bank.id))
         if bankId then
-            local ok, data = BccUtils.RPC:CallAsync('Feather:Banks:Admin:GetHours', { bank = bankId })
+            local ok, data = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetHours', { bank = bankId })
             if ok and data then
                 hoursActive = data.hours_active and true or false
                 openVal = tostring(data.open_hour or '')
@@ -301,7 +301,7 @@ function OpenAdminHoursMenu(Parent, bank)
             Notify(_U('admin_invalid_bank_id'), 3000)
             return
         end
-        local ok = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ToggleHours',
+        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ToggleHours',
             { bank = bankId, active = data.value and true or false })
         Notify(
         ok and
@@ -335,7 +335,7 @@ function OpenAdminHoursMenu(Parent, bank)
             Notify(_U('admin_invalid_hours_input') or 'Enter valid bank/hours', 3000)
             return
         end
-        local ok = BccUtils.RPC:CallAsync('Feather:Banks:Admin:SetHours', { bank = bankId, open = openH, close = closeH })
+        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetHours', { bank = bankId, open = openH, close = closeH })
         Notify(ok and (_U('admin_hours_updated') or 'Hours updated.') or _U('admin_action_failed'),
             ok and 'success' or 'error', 3500)
     end)
@@ -397,7 +397,7 @@ function OpenAdminRatesMenu(Parent, bank)
             Notify(_U('admin_invalid_bank_id'), 3000)
             return
         end
-        local ok, rate = BccUtils.RPC:CallAsync('Feather:Banks:Admin:GetBankRate', { bank = bankId })
+        local ok, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetBankRate', { bank = bankId })
         local msg = ok and
         (_U('admin_current_rate') .. ' ' .. (rate and toFixed(rate, 2) .. '%' or _U('admin_rate_not_set'))) or
         _U('admin_action_failed')
@@ -420,7 +420,7 @@ function OpenAdminRatesMenu(Parent, bank)
             Notify(_U('admin_invalid_input'), 3000)
             return
         end
-        local ok = BccUtils.RPC:CallAsync('Feather:Banks:Admin:SetBankRate', { bank = bankId, rate = rate })
+        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetBankRate', { bank = bankId, rate = rate })
         Notify(ok and _U('admin_rate_updated') or _U('admin_action_failed'), ok and 'success' or 'error', 3500)
     end)
 
@@ -492,7 +492,7 @@ function OpenAdminCharRatesMenu(Parent)
             Notify(_U('admin_invalid_char_id'), 3000)
             return
         end
-        local ok, rate = BccUtils.RPC:CallAsync('Feather:Banks:Admin:GetCharRate', { char = charId, bank = bankIdValue })
+        local ok, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetCharRate', { char = charId, bank = bankIdValue })
         local msg = ok and
         (_U('admin_current_rate') .. ' ' .. (rate and toFixed(rate, 2) .. '%' or _U('admin_rate_not_set'))) or
         _U('admin_action_failed')
@@ -515,7 +515,7 @@ function OpenAdminCharRatesMenu(Parent)
             Notify(_U('admin_invalid_input'), 3000)
             return
         end
-        local ok = BccUtils.RPC:CallAsync('Feather:Banks:Admin:SetCharRate',
+        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetCharRate',
             { char = charId, bank = bankIdValue, rate = rate })
         Notify(ok and _U('admin_rate_updated') or _U('admin_action_failed'), ok and 'success' or 'error', 3500)
     end)
@@ -528,7 +528,7 @@ function OpenAdminCharRatesMenu(Parent)
             Notify(_U('admin_invalid_char_id'), 3000)
             return
         end
-        local ok = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ClearCharRate', { char = charId, bank = bankIdValue })
+        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ClearCharRate', { char = charId, bank = bankIdValue })
         Notify(ok and _U('admin_rate_cleared') or _U('admin_action_failed'), ok and 'success' or 'error', 3500)
     end)
 
@@ -631,7 +631,7 @@ local function formatCreatedWithAmount(row)
     return created .. ' — $' .. amount
 end
 
-local function openAdminLoanDetails(loan, ParentPage, bank)
+local function openAdminLoanDetails(loan, ParentPage, bank, AdminParentPage)
     local loanId = tostring(loan.id)
     local detailPage = FeatherBankMenu:RegisterPage('bank:page:admin:loan:' .. loanId)
 
@@ -689,21 +689,21 @@ local function openAdminLoanDetails(loan, ParentPage, bank)
             label = _U('admin_approve_button') or 'Approve',
             style = {}
         }, function()
-            local okA = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ApproveLoan', { loan = NormalizeId(loanId) })
+            local okA = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ApproveLoan', { loan = NormalizeId(loanId) })
             if okA then
                 Notify(_U('admin_approved_notify') or 'Approved', 2500)
             end
-            OpenAdminLoansMenu(ParentPage, bank)
+            OpenAdminLoansMenu(AdminParentPage or ParentPage, bank)
         end)
         detailPage:RegisterElement('button', {
             label = _U('admin_reject_button') or 'Reject',
             style = {}
         }, function()
-            local okR = BccUtils.RPC:CallAsync('Feather:Banks:Admin:RejectLoan', { loan = NormalizeId(loanId) })
+            local okR = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:RejectLoan', { loan = NormalizeId(loanId) })
             if okR then
                 Notify(_U('admin_rejected_notify') or 'Rejected', 2500)
             end
-            OpenAdminLoansMenu(ParentPage, bank)
+            OpenAdminLoansMenu(AdminParentPage or ParentPage, bank)
         end)
     end
 
@@ -728,7 +728,7 @@ local function openAdminLoanDetails(loan, ParentPage, bank)
     FeatherBankMenu:Open({ startupPage = detailPage })
 end
 
-local function renderLoanButtons(page, loans, bank)
+local function renderLoanButtons(page, loans, bank, AdminParentPage)
     if not loans or #loans == 0 then return end
 
     for _, loan in ipairs(loans) do
@@ -740,7 +740,7 @@ local function renderLoanButtons(page, loans, bank)
             label = label,
             style = {}
         }, function()
-            openAdminLoanDetails(loan, page, bank)
+            openAdminLoanDetails(loan, page, bank, AdminParentPage)
         end)
     end
 end
@@ -765,7 +765,7 @@ function OpenAdminAccountsMenu(Parent, bank)
     -- Helper: fetch and render accounts as buttons (Owner — Account)
     local function renderAccountsList(bankId)
         if not bankId then return end
-        local ok, rows = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ListAccounts', { bank = bankId })
+        local ok, rows = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListAccounts', { bank = bankId })
         if not ok then
             Notify(_U('admin_action_failed'), 3000)
             return
@@ -866,7 +866,7 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
     local function renderLockedList(bankId)
         if not bankId then return end
 
-        local ok, rows = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ListFrozenAccounts', { bank = bankId })
+        local ok, rows = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListFrozenAccounts', { bank = bankId })
         if not ok then
             Notify(_U('admin_action_failed'), 3000)
             return
@@ -906,7 +906,7 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
                 label = _U('admin_unlock_account_button'),
                 style = {}
             }, function()
-                local okUnlock = BccUtils.RPC:CallAsync('Feather:Banks:Admin:SetAccountFrozen', {
+                local okUnlock = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetAccountFrozen', {
                     account = tostring(accData.id),
                     frozen = false
                 })
@@ -1054,7 +1054,7 @@ function OpenAdminAccountTransactionsPage(acc, transactions, ParentPage)
 end
 
 function OpenAdminAccountDetails(accountId, ParentPage)
-    local ok, resp = BccUtils.RPC:CallAsync('Feather:Banks:Admin:GetAccount', { account = tostring(accountId) })
+    local ok, resp = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetAccount', { account = tostring(accountId) })
     if not ok or not resp or not resp.account then
         Notify(_U('admin_action_failed') or 'Failed to load account.', 'error', 3500)
         return
@@ -1121,7 +1121,7 @@ function OpenAdminAccountDetails(accountId, ParentPage)
         style = {}
     }, function()
         local targetState = not isFrozen
-        local okSet = BccUtils.RPC:CallAsync('Feather:Banks:Admin:SetAccountFrozen', {
+        local okSet = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetAccountFrozen', {
             account = tostring(acc.id),
             frozen = targetState
         })
@@ -1139,7 +1139,7 @@ function OpenAdminAccountDetails(accountId, ParentPage)
         label = _U('admin_delete_account_button') or 'Delete Account',
         style = {}
     }, function()
-        local okDel = BccUtils.RPC:CallAsync('Feather:Banks:Admin:DeleteAccount', { account = tostring(acc.id) })
+        local okDel = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:DeleteAccount', { account = tostring(acc.id) })
         Notify(okDel and (_U('admin_delete_account_success') or 'Account deleted.') or
             (_U('admin_delete_account_failed') or 'Failed to delete account.'),
             okDel and 'success' or 'error', 3500)
@@ -1152,7 +1152,7 @@ function OpenAdminAccountDetails(accountId, ParentPage)
         label = _U('admin_force_delete_account_button') or 'Force Delete Account',
         style = {}
     }, function()
-        local okDel = BccUtils.RPC:CallAsync('Feather:Banks:Admin:DeleteAccount', {
+        local okDel = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:DeleteAccount', {
             account = tostring(acc.id),
             force = true
         })
@@ -1221,13 +1221,13 @@ function OpenAdminLoansMenu(Parent, bank)
     local function loadLoanSections(targetBankId)
         if not targetBankId then return end
 
-        local okPending, pendingLoans = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ListPendingLoans', { bank = targetBankId })
+        local okPending, pendingLoans = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListPendingLoans', { bank = targetBankId })
         if not okPending then
             Notify(_U('admin_action_failed'), 3000)
             return
         end
 
-        local okAll, allLoans = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ListLoans', { bank = targetBankId })
+        local okAll, allLoans = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListLoans', { bank = targetBankId })
         if not okAll then
             Notify(_U('admin_action_failed'), 3000)
             return
@@ -1246,7 +1246,7 @@ function OpenAdminLoansMenu(Parent, bank)
                 value = _U('admin_pending_loans') or 'Pending Loans',
                 slot  = 'content'
             })
-            renderLoanButtons(AdminLoansPage, pendingLoans, bank)
+            renderLoanButtons(AdminLoansPage, pendingLoans, bank, Parent)
         end
 
         local remaining = {}
@@ -1276,7 +1276,7 @@ function OpenAdminLoansMenu(Parent, bank)
                 value = _U('admin_all_loans') or 'All Loans',
                 slot  = 'content'
             })
-            renderLoanButtons(AdminLoansPage, remaining, bank)
+            renderLoanButtons(AdminLoansPage, remaining, bank, Parent)
         end
 
         if not hasAny then
@@ -1351,7 +1351,7 @@ function OpenAdminSDBsMenu(Parent, bank)
             Notify(_U('admin_invalid_bank_id'), 3000)
             return
         end
-        local ok, rows = BccUtils.RPC:CallAsync('Feather:Banks:Admin:ListSDBs', { bank = bankId })
+        local ok, rows = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListSDBs', { bank = bankId })
         if not ok then
             Notify(_U('admin_action_failed'), 3000)
             return
@@ -1380,7 +1380,7 @@ function OpenAdminSDBsMenu(Parent, bank)
                     FeatherBankMenu:Close()
                     SetNuiFocus(false, false)
                     Wait(250)
-                    local okOpen = BccUtils.RPC:CallAsync('Feather:Banks:Admin:OpenSDB', { sdb_id = NormalizeId(box.id) })
+                    local okOpen = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:OpenSDB', { sdb_id = NormalizeId(box.id) })
                     if not okOpen then
                         Notify(_U('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
                     end

@@ -120,7 +120,7 @@ function OpenGiveAccessPage(account, ParentPage)
             return
         end
 
-        local ok, result = BccUtils.RPC:CallAsync("Feather:Banks:GiveAccountAccess", {
+        local ok, result = exports['feather-core']:CallRPCAsync("Feather:Banks:GiveAccountAccess", {
             account    = account.id,
             first_name = fn,
             last_name  = ln,
@@ -165,7 +165,7 @@ function OpenRemoveAccessPage(account, ParentPage)
 
     local accountId = NormalizeId(account.id)
 
-    local ok, response = BccUtils.RPC:CallAsync("Feather:Banks:GetAccountAccessList", {
+    local ok, response = exports['feather-core']:CallRPCAsync("Feather:Banks:GetAccountAccessList", {
         account = accountId
     })
 
@@ -206,7 +206,7 @@ function OpenRemoveAccessPage(account, ParentPage)
                     label = _U("confirm_removal_button"),
                     style = {}
                 }, function()
-                    local ok = BccUtils.RPC:CallAsync("Feather:Banks:RemoveAccountAccess", {
+                    local ok = exports['feather-core']:CallRPCAsync("Feather:Banks:RemoveAccountAccess", {
                         account   = accountId,
                         character = access.character_id
                     })

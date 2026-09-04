@@ -2,21 +2,22 @@ function GetCharacterByName(firstName, lastName)
     if not firstName or not lastName or firstName == '' or lastName == '' then
         return nil
     end
-    local row = MySQL.query.await(
-        'SELECT `charidentifier` FROM `characters` WHERE LOWER(`firstname`) = LOWER(?) AND LOWER(`lastname`) = LOWER(?) LIMIT 1',
-        { firstName, lastName }
-    )
-    return row and row[1] and row[1].charidentifier
+    local found = exports['feather-core']:GetProvider('character-profile', nil, 1)
+    local provider = found and found.ok == true and found.value and found.value.implementation or nil
+    local result = provider and provider.SearchProfiles and provider.SearchProfiles(firstName .. ' ' .. lastName, 1, 20) or nil
+    for _, profile in ipairs(result and result.ok == true and result.value.profiles or {}) do
+        if tostring(profile.firstName):lower() == tostring(firstName):lower()
+            and tostring(profile.lastName):lower() == tostring(lastName):lower() then return profile.characterId end
+    end
 end
 
 function GetCharacterName(charId)
     if not charId then return nil, nil end
-    local row = MySQL.query.await(
-        'SELECT `firstname`, `lastname` FROM `characters` WHERE `charidentifier` = ? LIMIT 1',
-        { charId }
-    )
-    if not row or not row[1] then return nil, nil end
-    return row[1].firstname, row[1].lastname
+    local found = exports['feather-core']:GetProvider('character-profile', nil, 1)
+    local provider = found and found.ok == true and found.value and found.value.implementation or nil
+    local result = provider and provider.GetProfile and provider.GetProfile(tostring(charId)) or nil
+    local profile = result and result.ok == true and result.value or nil
+    return profile and profile.firstName or nil, profile and profile.lastName or nil
 end
 
 function CreateCheck(accountId, issuerCharId, recipientCharId, amount, memo)
@@ -35,7 +36,7 @@ function CreateCheck(accountId, issuerCharId, recipientCharId, amount, memo)
         return { status = false, message = 'Insufficient funds.' }
     end
 
-    local checkId = BccUtils.UUID()
+    local checkId = MySQL.scalar.await('SELECT UUID()')
     local inserted = MySQL.insert.await(
         'INSERT INTO `bcc_checks` (`id`, `account_id`, `issuer_character_id`, `recipient_character_id`, `amount`, `memo`, `status`) VALUES (?, ?, ?, ?, ?, ?, "pending")',
         { checkId, accountId, issuerCharId, recipientCharId, amount, tostring(memo or ''):sub(1, 200) }
@@ -63,25 +64,23 @@ end
 
 function GetPendingChecksForRecipient(characterId)
     local rows = MySQL.query.await(
-        [[SELECT c.*, ch.firstname AS issuer_first, ch.lastname AS issuer_last
-          FROM `bcc_checks` c
-          LEFT JOIN `characters` ch ON ch.charidentifier = c.issuer_character_id
+        [[SELECT c.* FROM `bcc_checks` c
           WHERE c.recipient_character_id = ? AND c.status = "pending"
           ORDER BY c.created_at DESC]],
         { characterId }
     )
+    for _, row in ipairs(rows or {}) do row.issuer_first, row.issuer_last = GetCharacterName(row.issuer_character_id) end
     return rows or {}
 end
 
 function GetPendingChecksFromAccount(accountId)
     local rows = MySQL.query.await(
-        [[SELECT c.*, ch.firstname AS recipient_first, ch.lastname AS recipient_last
-          FROM `bcc_checks` c
-          LEFT JOIN `characters` ch ON ch.charidentifier = c.recipient_character_id
+        [[SELECT c.* FROM `bcc_checks` c
           WHERE c.account_id = ? AND c.status = "pending"
           ORDER BY c.created_at DESC]],
         { accountId }
     )
+    for _, row in ipairs(rows or {}) do row.recipient_first, row.recipient_last = GetCharacterName(row.recipient_character_id) end
     return rows or {}
 end
 
@@ -147,7 +146,7 @@ function VoidCheck(checkId, characterId)
     end
     AddAccountTransaction(
         check.account_id,
-        tonumber(characterId),
+        characterId,
         tonumber(check.amount),
         'check - voided',
         'Check voided, funds returned'

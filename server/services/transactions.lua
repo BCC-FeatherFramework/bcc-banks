@@ -1,4 +1,4 @@
-BccUtils.RPC:Register('Feather:Banks:GetTransactions', function(params, cb, src)
+exports['feather-core']:RegisterRPC('Feather:Banks:GetTransactions', function(params, cb, src)
     devPrint("RPC called by src:", src)
 
     local account = NormalizeId(params and params.account)
@@ -11,9 +11,9 @@ BccUtils.RPC:Register('Feather:Banks:GetTransactions', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
-    local char = user and user.getUsedCharacter
-    local characterId = char and char.charIdentifier
+    local user = GetBankingContext(src)
+    local char = user
+    local characterId = char and char.characterId
     if not characterId or not (HasAccountAccess(account, characterId) or IsAccountOwner(account, characterId)) then
         NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
         cb(false)

@@ -23,8 +23,16 @@ function AddNPC(bank)
 	-- A resource restart can leave the old locally-created wrapper entity behind.
 	-- Remove matching tellers at this exact bank before creating its replacement.
 	clearOrphanedTellersAtBank(bank)
-	local npc = BccUtils.Ped:Create(Config.NPCSettings.Model, tonumber(bank.x), tonumber(bank.y), tonumber(bank.z),tonumber(bank.h), 'world', false, nil, nil, true, nil)
-	local ped = npc:GetPed()
+	local created = exports['feather-toolkit']:CreatePed({
+		model = Config.NPCSettings.Model, x = tonumber(bank.x), y = tonumber(bank.y),
+		z = tonumber(bank.z), heading = tonumber(bank.h), networked = false, scriptHost = true
+	})
+	if type(created) ~= 'table' or created.ok ~= true then
+		error(('[bcc-banks] teller creation failed: %s'):format(
+			tostring(type(created) == 'table' and created.code or 'invalid_result')))
+	end
+	local npc = { id = created.value.id, ped = created.value.entity }
+	local ped = npc.ped
 
 	-- Teller NPCs are fixtures, not ambient pedestrians. Blocking ambient events and
 	-- fleeing prevents gunshots from starting a flee task while the entity is frozen
@@ -35,16 +43,15 @@ function AddNPC(bank)
 	SetPedCanRagdoll(ped, false)
 	SetEntityInvincible(ped, true)
 	SetEntityCanBeDamaged(ped, false)
-	npc:Freeze()
+	FreezeEntityPosition(ped, true)
 	return npc
 end
 
 function RemoveNPC(bank)
 	if not bank or not bank.npc then return end
 	local npc = bank.npc
-	local ok, ped = pcall(function() return npc:GetPed() end)
-	if ok then deletePedEntity(ped) end
-	pcall(function() npc:Remove() end)
+	deletePedEntity(npc.ped)
+	if npc.id then exports['feather-toolkit']:RemoveEntity(npc.id) end
 	bank.npc = nil
 	bank.npcSpawning = false
 end

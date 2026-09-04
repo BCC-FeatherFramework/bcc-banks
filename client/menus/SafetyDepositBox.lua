@@ -12,7 +12,7 @@ function OpenSDBListPage(bank, ParentPage)
         slot  = 'header',
         style = {}
     })
-    local ok, boxes = BccUtils.RPC:CallAsync('Feather:Banks:GetSDBs', { bank = bank.id })
+    local ok, boxes = exports['feather-core']:CallRPCAsync('Feather:Banks:GetSDBs', { bank = bank.id })
     if not ok or not boxes or #boxes == 0 then
         SDBListPage:RegisterElement('textdisplay', {
             value = _U("no_boxes_found"),
@@ -110,7 +110,7 @@ end
 function OpenSDBDeleteConfirmPage(box, ParentPage, SDBListPage, bank)
     local DeletePage = FeatherBankMenu:RegisterPage('sdb:page:delete:' .. tostring(box.id))
     local hasInventoryItems = false
-    local infoOk, deleteInfo = BccUtils.RPC:CallAsync('Feather:Banks:GetSDBDeleteInfo', {
+    local infoOk, deleteInfo = exports['feather-core']:CallRPCAsync('Feather:Banks:GetSDBDeleteInfo', {
         sdb_id = NormalizeId(box.id)
     })
     if infoOk and deleteInfo and deleteInfo.hasItems then
@@ -135,7 +135,7 @@ function OpenSDBDeleteConfirmPage(box, ParentPage, SDBListPage, bank)
         label = _U("confirm_delete_sdb_button"),
         style = {}
     }, function()
-        local ok = BccUtils.RPC:CallAsync('Feather:Banks:DeleteSDB', {
+        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:DeleteSDB', {
             sdb_id = NormalizeId(box.id)
         })
         if ok then
@@ -175,7 +175,7 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
         style = {}
     })
     local sdbName = initialName or ''
-    local sdbSize = initialSize or nil
+    local sdbSize = initialSize or 'Small'
     CreateSDBPage:RegisterElement('input', {
         label       = _U("box_name_label"),
         placeholder = (sdbName ~= '' and sdbName) or _U("box_name_placeholder"),
@@ -211,74 +211,41 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
     end)
     
     CreateSDBPage:RegisterElement('line', { style = {} })
-    CreateSDBPage:RegisterElement('textdisplay', {
-        value = _U('select_size_text'),
-        slot  = 'content'
-    })
 
-    -- Show slot counts per size so players can choose informed
     local sizes = (Config and Config.SafetyDepositBoxes and Config.SafetyDepositBoxes.Sizes) or {}
     local smallSlots  = tonumber(sizes.Small  and sizes.Small.MaxWeight)  or 0
     local mediumSlots = tonumber(sizes.Medium and sizes.Medium.MaxWeight) or 0
     local largeSlots  = tonumber(sizes.Large  and sizes.Large.MaxWeight)  or 0
 
-    local function priceStr(cashVal, goldVal)
-        if payWith == 'gold' then
-            return tostring(tonumber(goldVal or 0) or 0) .. ' gold'
-        else
-            return '$' .. tostring(tonumber(cashVal or 0) or 0)
-        end
-    end
-
-    local sizeImage = 'nui://bcc-banks/ui/images/safety_deposit_box.png'
-    local sizeOptions = {
-        {
-            size = 'Small',
-            label = _U('size_small_button'),
-            slots = smallSlots,
-            price = priceStr(sizes.Small and sizes.Small.CashPrice, sizes.Small and sizes.Small.GoldPrice)
-        },
-        {
-            size = 'Medium',
-            label = _U('size_medium_button'),
-            slots = mediumSlots,
-            price = priceStr(sizes.Medium and sizes.Medium.CashPrice, sizes.Medium and sizes.Medium.GoldPrice)
-        },
-        {
-            size = 'Large',
-            label = _U('size_large_button'),
-            slots = largeSlots,
-            price = priceStr(sizes.Large and sizes.Large.CashPrice, sizes.Large and sizes.Large.GoldPrice)
-        }
-    }
-    local sizeItems = {}
-    for index, option in ipairs(sizeOptions) do
-        table.insert(sizeItems, {
-            type = 'imagebox',
-            index = index,
-            data = {
-                img = sizeImage,
-                label = option.price,
-                tooltip = option.label .. ' - ' .. tostring(option.slots) .. ' slots',
-                badge = nil,
-                style = { margin = '6px' },
-                disabled = false,
-                sound = {
-                    action = 'SELECT',
-                    soundset = 'RDRO_Character_Creator_Sounds'
-                }
+    CreateSDBPage:RegisterElement('arrows', {
+        label = _U('select_size_text'),
+        start = sdbSize == 'Large' and 3 or (sdbSize == 'Medium' and 2 or 1),
+        options = {
+            {
+                display = (_U('size_small_button') or 'Small') .. ' - ' .. tostring(smallSlots) .. ' slots - ' ..
+                    (payWith == 'gold' and (tostring(tonumber(sizes.Small and sizes.Small.GoldPrice or 0) or 0) .. ' gold')
+                        or ('$' .. tostring(tonumber(sizes.Small and sizes.Small.CashPrice or 0) or 0))),
+                extra = 'Small'
+            },
+            {
+                display = (_U('size_medium_button') or 'Medium') .. ' - ' .. tostring(mediumSlots) .. ' slots - ' ..
+                    (payWith == 'gold' and (tostring(tonumber(sizes.Medium and sizes.Medium.GoldPrice or 0) or 0) .. ' gold')
+                        or ('$' .. tostring(tonumber(sizes.Medium and sizes.Medium.CashPrice or 0) or 0))),
+                extra = 'Medium'
+            },
+            {
+                display = (_U('size_large_button') or 'Large') .. ' - ' .. tostring(largeSlots) .. ' slots - ' ..
+                    (payWith == 'gold' and (tostring(tonumber(sizes.Large and sizes.Large.GoldPrice or 0) or 0) .. ' gold')
+                        or ('$' .. tostring(tonumber(sizes.Large and sizes.Large.CashPrice or 0) or 0))),
+                extra = 'Large'
             }
-        })
-    end
-    CreateSDBPage:RegisterElement('imageboxcontainer', {
-        slot = 'content',
-        showBadges = true,
-        items = sizeItems
+        },
+        persist = true,
+        slot = 'content'
     }, function(data)
-        local selected = data and data.child and sizeOptions[data.child.index]
-        if selected then
-            sdbSize = selected.size
-            Notify(_U("size_selected_notify", selected.label), 2000)
+        if data and data.value and data.value.extra then
+            sdbSize = data.value.extra
+            Notify(_U('size_selected_notify', sdbSize), 1500)
         end
     end)
     CreateSDBPage:RegisterElement('line', {
@@ -298,7 +265,7 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
             Notify(_U("select_size_notify"), 3000)
             return
         end
-        local ok, result = BccUtils.RPC:CallAsync('Feather:Banks:CreateSDB', {
+        local ok, result = exports['feather-core']:CallRPCAsync('Feather:Banks:CreateSDB', {
             name = sdbName,
             bank = bank.id,
             size = sdbSize,
@@ -331,7 +298,7 @@ function OpenSDBInventory(sdb, ParentPage)
     Wait(250)
     local sdbId = NormalizeId(sdb and sdb.id)
     devPrint('[SDB] Normalized sdb.id ->', tostring(sdbId))
-    local ok = BccUtils.RPC:CallAsync('Feather:Banks:OpenSDB', { sdb_id = sdbId })
+    local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:OpenSDB', { sdb_id = sdbId })
     devPrint('[SDB] RPC Feather:Banks:OpenSDB returned:', tostring(ok))
     if not ok then
         devPrint('[SDB] OpenSDB RPC failed for id=', tostring(sdbId))
@@ -441,7 +408,7 @@ function OpenSDBGiveAccessPage(sdb, ParentPage, SDBListPage)
             Notify(_U("invalid_char_id_level"), 4000)
             return
         end
-        local ok, res = BccUtils.RPC:CallAsync('Feather:Banks:AddSDBAccess', {
+        local ok, res = exports['feather-core']:CallRPCAsync('Feather:Banks:AddSDBAccess', {
             sdb_id     = NormalizeId(sdb.id),
             character  = charId,
             user_src   = charId,
@@ -491,7 +458,7 @@ function OpenSDBRemoveAccessPage(sdb, ParentPage, SDBListPage)
         slot  = 'header',
         style = {}
     })
-    local ok, result = BccUtils.RPC:CallAsync('Feather:Banks:GetSDBAccessList', { sdb_id = NormalizeId(sdb.id) })
+    local ok, result = exports['feather-core']:CallRPCAsync('Feather:Banks:GetSDBAccessList', { sdb_id = NormalizeId(sdb.id) })
     local accessList = (ok and result and result.access) or {}
     if #accessList == 0 then
         SDBRemoveAccessPage:RegisterElement('textdisplay', {
@@ -521,7 +488,7 @@ function OpenSDBRemoveAccessPage(sdb, ParentPage, SDBListPage)
                     label = _U("confirm_remove_button"),
                     style = {}
                 }, function()
-                    local ok = BccUtils.RPC:CallAsync('Feather:Banks:RemoveSDBAccess', {
+                    local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:RemoveSDBAccess', {
                         sdb_id    = NormalizeId(sdb.id),
                         character = access.character_id
                     })
