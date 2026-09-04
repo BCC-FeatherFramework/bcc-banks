@@ -1,0 +1,796 @@
+-- Admin/Banker server commands for managing bank loan rates and inspecting data
+
+-- Unified mail sender — dispatches to whichever script is set in Config.Mail.Script
+local function sendMailToCharacter(charId, fromName, subject, body)
+    if not charId or not subject or not body then return end
+
+    local mailCfg = Config.Mail or {}
+    local script  = tostring(mailCfg.Script or 'bcc-mailbox'):lower()
+
+    -- ── bcc-mailbox ───────────────────────────────────────────────────────────
+    if script == 'bcc-mailbox' then
+        local helper = BccBanksInternal and BccBanksInternal.getMailboxApi
+        local api
+        if helper then
+            api = helper()
+        else
+            local ok, res = pcall(function()
+                return exports['bcc-mailbox']:getMailboxAPI()
+            end)
+            if ok then api = res end
+        end
+        if not api then
+            devPrint('[Mail] bcc-mailbox API not available')
+            return
+        end
+        api:SendMailToCharacter(charId, subject, body, { fromName = fromName })
+
+    -- ── custom server event ───────────────────────────────────────────────────
+    elseif script == 'custom' then
+        local event = tostring(mailCfg.CustomEvent or '')
+        if event == '' then
+            devPrint('[Mail] Config.Mail.Script is "custom" but Config.Mail.CustomEvent is not set')
+            return
+        end
+        TriggerEvent(event, charId, fromName, subject, body)
+
+    else
+        devPrint('[Mail] Unknown Config.Mail.Script value:', script)
+    end
+end
+
+BccBanksInternal = BccBanksInternal or {}
+BccBanksInternal.sendMailToCharacter = sendMailToCharacter
+
+local function formatCurrency(amount)
+    if BccBanksInternal and BccBanksInternal.formatCurrency then
+        return BccBanksInternal.formatCurrency(amount)
+    end
+    local num = tonumber(amount) or 0
+    return string.format('%.2f', num)
+end
+
+local function safeFormat(fmt, ...)
+    if BccBanksInternal and BccBanksInternal.safeFormat then
+        return BccBanksInternal.safeFormat(fmt, ...)
+    end
+    if type(fmt) ~= 'string' then return '' end
+    local ok, result = pcall(string.format, fmt, ...)
+    if ok then return result end
+    return fmt
+end
+
+local function formatDateTime(value)
+    if value == nil then return nil end
+    local num = tonumber(value)
+    if num then
+        if num > 1e12 then
+            num = num / 1000
+        end
+        return os.date('%Y-%m-%d %H:%M:%S', math.floor(num))
+    end
+    local str = tostring(value)
+    if str == '' then return nil end
+    return str
+end
+
+local function getBankNameForLoan(loan)
+    if not loan then return nil end
+    local bankId = loan.bank_id
+    if (not bankId or bankId == '') and loan.account_id then
+        bankId = GetBankIdForAccount(loan.account_id)
+    end
+    bankId = NormalizeId(bankId)
+    if not bankId then return nil end
+    local row = MySQL.query.await('SELECT name FROM `bcc_banks` WHERE id = ? LIMIT 1', { bankId })
+    return row and row[1] and row[1].name or nil
+end
+
+local function sendLoanStatusMail(loan, status)
+    if not loan or not loan.character_id then return end
+
+    local cfg = (Config and Config.LoanStatusMail) or {}
+    if cfg.Enabled == false then return end
+    if not (Config.Mail and Config.Mail.Script) then
+        devPrint('[Mail] Config.Mail.Script not set — skipping loan mail')
+        return
+    end
+    if status == 'approved' and cfg.SendOnApprove == false then return end
+    if status == 'rejected' and cfg.SendOnReject == false then return end
+
+    local bankName  = getBankNameForLoan(loan)
+    local bankLabel = bankName or cfg.MailFrom or _U('mail_sender_default') or 'Bank'
+    local fromName  = cfg.MailFrom or bankName or _U('mail_sender_default') or 'Bank Postmaster'
+    local amountText = formatCurrency(loan.amount)
+
+    local subject
+    if status == 'approved' then
+        subject = cfg.ApproveSubject
+            and safeFormat(cfg.ApproveSubject, amountText, bankLabel, tostring(loan.id or ''))
+            or  (_U('mail_loan_approved_subject') or 'Loan Approved')
+    else
+        subject = cfg.RejectSubject
+            and safeFormat(cfg.RejectSubject, amountText, bankLabel, tostring(loan.id or ''))
+            or  (_U('mail_loan_rejected_subject') or 'Loan Rejected')
+    end
+
+    local body
+    if status == 'approved' then
+        if cfg.ApproveBody then
+            body = safeFormat(cfg.ApproveBody, amountText, bankLabel, tostring(loan.id or ''))
+        else
+            local intro      = _U('mail_loan_approved_body_intro') or 'Your loan request has been approved.'
+            local outro      = _U('mail_loan_approved_body_outro') or 'Visit the bank to access the funds.'
+            local amountLine = (_U('mail_amount_label') or 'Amount: ') .. amountText
+            local bankLine   = (_U('mail_bank_label')   or 'Bank: ')   .. bankLabel
+            body = table.concat({ intro, amountLine, bankLine, outro }, '\n')
+        end
+    else
+        if cfg.RejectBody then
+            body = safeFormat(cfg.RejectBody, amountText, bankLabel, tostring(loan.id or ''))
+        else
+            local intro      = _U('mail_loan_rejected_body_intro') or 'Your loan request has been rejected.'
+            local outro      = _U('mail_loan_rejected_body_outro') or 'Please contact the bank for details.'
+            local amountLine = (_U('mail_amount_label') or 'Amount: ') .. amountText
+            local bankLine   = (_U('mail_bank_label')   or 'Bank: ')   .. bankLabel
+            body = table.concat({ intro, amountLine, bankLine, outro }, '\n')
+        end
+    end
+
+    sendMailToCharacter(loan.character_id, fromName, subject, body)
+end
+
+local function enrichLoanFinancials(rows)
+    if not rows or #rows == 0 then return end
+    for _, row in ipairs(rows) do
+        local stats = ComputeLoanOutstanding(row.id)
+        if stats then
+            row.total_due = stats.total_due
+            row.total_repaid = stats.repaid
+            row.total_outstanding = stats.outstanding
+        end
+        row.created_at_display = formatDateTime(row.created_at)
+        row.updated_at_display = formatDateTime(row.updated_at)
+    end
+end
+
+function IsBankAdmin(src)
+    devPrint('[ADMIN] IsBankAdmin called. src=', src)
+
+    local AdminCfg = (Config and Config.Admin) or {}
+    if src == 0 and AdminCfg.allowConsole ~= false then
+        devPrint('[ADMIN] Granting admin: source is console (0)')
+        return true
+    end
+
+    local resolved = exports['feather-roles']:GetActorRole(src)
+    if type(resolved) ~= 'table' or resolved.ok ~= true
+        or type(resolved.value) ~= 'table' or type(resolved.value.role) ~= 'table' then
+        devPrint('[ADMIN] Deny: Feather Roles could not resolve the active character role.',
+            type(resolved) == 'table' and resolved.code or 'invalid_result')
+        return false
+    end
+
+    local actorRole = resolved.value.role
+    for _, roleKey in ipairs(AdminCfg.roles or { 'admin', 'owner' }) do
+        if actorRole.key == roleKey then
+            devPrint('[ADMIN] Granting admin through Feather role:', actorRole.key,
+                'level=', actorRole.level, 'character=', resolved.value.characterId)
+            return true
+        end
+    end
+
+    devPrint('[ADMIN] Deny: Feather role is not allowed:', actorRole.key, 'level=', actorRole.level)
+    return false
+end
+
+exports['feather-core']:RegisterRPC('Feather:Banks:CheckAdmin', function(_, cb, src)
+    devPrint('[DEV] RPC Feather:Banks:CheckAdmin called by src=' .. tostring(src))
+    local allowed = IsBankAdmin(src) == true
+    -- Return (ok=true, payload=allowed) to match other RPC patterns
+    cb(true, allowed)
+end)
+
+-- RPC: get/set bank rate
+local function isValidInterestRate(value)
+    local rate = tonumber(value)
+    return rate ~= nil and rate == rate and rate > -math.huge and rate < math.huge
+        and rate >= 0 and rate <= 100
+end
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetBankRate', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] GetBankRate denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    if not bankId then
+        devPrint('[ADMIN] GetBankRate invalid bank id:', params and params.bank)
+        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local row = MySQL.query.await('SELECT interest FROM `bcc_bank_interest_rates` WHERE bank_id = ? LIMIT 1', { bankId })
+    local rate = row and row[1] and row[1].interest
+    cb(true, rate and tonumber(rate) or nil)
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetBankRate', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] SetBankRate denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    local rate = tonumber(params and params.rate)
+    if not bankId or not isValidInterestRate(rate) then
+        devPrint('[ADMIN] SetBankRate invalid input bankId/rate:', bankId, rate)
+        NotifyClient(src, _U('admin_invalid_input') or 'Invalid input', 'error', 3500)
+        cb(false)
+        return
+    end
+    MySQL.query.await('INSERT INTO `bcc_bank_interest_rates` (bank_id, interest) VALUES (?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', { bankId, rate })
+    cb(true)
+end)
+
+-- RPC: get/set/clear char rate
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetCharRate', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] GetCharRate denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local charId = tonumber(params and params.char)
+    local bankId = NormalizeId(params and params.bank)
+    if not charId then
+        devPrint('[ADMIN] GetCharRate invalid char id:', params and params.char)
+        NotifyClient(src, _U('admin_invalid_char_id') or 'Invalid char id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local row
+    if not bankId or bankId == '0' then
+        -- Use bank_id = '0' to represent global rate
+        row = MySQL.query.await('SELECT interest FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ? LIMIT 1', { charId, '0' })
+    else
+        row = MySQL.query.await('SELECT interest FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ? LIMIT 1', { charId, bankId })
+    end
+    local rate = row and row[1] and row[1].interest
+    cb(true, rate and tonumber(rate) or nil)
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetCharRate', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] SetCharRate denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local charId = tonumber(params and params.char)
+    local bankId = NormalizeId(params and params.bank)
+    local rate = tonumber(params and params.rate)
+    if not charId or not isValidInterestRate(rate) then
+        devPrint('[ADMIN] SetCharRate invalid input charId/rate:', charId, rate)
+        NotifyClient(src, _U('admin_invalid_input') or 'Invalid input', 'error', 3500)
+        cb(false)
+        return
+    end
+    if not bankId or bankId == '0' then
+        -- Store global rate with bank_id = '0'
+        MySQL.query.await('INSERT INTO `bcc_loan_interest_rates` (character_id, bank_id, interest) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', { charId, '0', rate })
+    else
+        MySQL.query.await('INSERT INTO `bcc_loan_interest_rates` (character_id, bank_id, interest) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', { charId, bankId, rate })
+    end
+    cb(true)
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ClearCharRate', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] ClearCharRate denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local charId = tonumber(params and params.char)
+    local bankId = NormalizeId(params and params.bank)
+    if not charId then
+        devPrint('[ADMIN] ClearCharRate invalid char id:', params and params.char)
+        NotifyClient(src, _U('admin_invalid_char_id') or 'Invalid char id', 'error', 3500)
+        cb(false)
+        return
+    end
+    if not bankId or bankId == '0' then
+        -- Clear global rate stored with bank_id = '0'
+        MySQL.query.await('DELETE FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ?', { charId, '0' })
+    else
+        MySQL.query.await('DELETE FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ?', { charId, bankId })
+    end
+    cb(true)
+end)
+
+-- RPC: lists
+
+local function attachLoanBorrowerNames(rows)
+    if not rows or #rows == 0 then return end
+    local providerResult = exports['feather-core']:GetProvider('character-profile', nil, 1)
+    local provider = type(providerResult) == 'table' and providerResult.ok == true
+        and providerResult.value and providerResult.value.implementation or nil
+    local names = {}
+    for _, row in ipairs(rows) do
+        local key = row.character_id and tostring(row.character_id) or nil
+        if key and names[key] == nil then
+            local profileResult = provider and provider.GetProfile and provider.GetProfile(key) or nil
+            local profile = type(profileResult) == 'table' and profileResult.ok == true and profileResult.value or nil
+            names[key] = profile and {
+                firstname = profile.firstName,
+                lastname = profile.lastName
+            } or false
+        end
+        if key and names[key] then
+            row.borrower_firstname = names[key].firstname
+            row.borrower_lastname = names[key].lastname
+        end
+    end
+end
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListAccounts', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] ListAccounts denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    if not bankId then
+        devPrint('[ADMIN] ListAccounts invalid bank id:', params and params.bank)
+        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local rows = MySQL.query.await('SELECT id, name, owner_id, cash, gold FROM `bcc_accounts` WHERE bank_id = ? ORDER BY id DESC', { bankId })
+    for _, row in ipairs(rows or {}) do
+        local fn, ln = GetCharacterName(row.owner_id)
+        row.owner_firstname = fn
+        row.owner_lastname = ln
+    end
+    cb(true, rows or {})
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListFrozenAccounts', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] ListFrozenAccounts denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local bankId = NormalizeId(params and params.bank)
+    if not bankId then
+        devPrint('[ADMIN] ListFrozenAccounts invalid bank id:', params and params.bank)
+        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local rows = MySQL.query.await('SELECT id, name, owner_id, account_number, cash, gold FROM `bcc_accounts` WHERE bank_id = ? AND is_frozen = 1 ORDER BY id DESC', { bankId })
+    for _, row in ipairs(rows or {}) do
+        local fn, ln = GetCharacterName(row.owner_id)
+        row.owner_firstname = fn
+        row.owner_lastname = ln
+    end
+    cb(true, rows or {})
+end)
+
+-- Admin: get full account details (bypass access rules, admin-only)
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetAccount', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] GetAccount denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local accId = NormalizeId(params and params.account)
+    if not accId then
+        devPrint('[ADMIN] GetAccount invalid account id:', params and params.account)
+        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local row = MySQL.query.await('SELECT * FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
+    row = row and row[1] or nil
+    if not row then
+        cb(false)
+        return
+    end
+
+    do
+        local fn, ln = nil, nil
+        local ownerId = row.owner_id and tostring(row.owner_id) or nil
+        if ownerId then
+            local providerResult = exports['feather-core']:GetProvider('character-profile', nil, 1)
+            local provider = type(providerResult) == 'table' and providerResult.ok == true
+                and providerResult.value and providerResult.value.implementation or nil
+            local profileResult = provider and provider.GetProfile and provider.GetProfile(ownerId) or nil
+            local profile = type(profileResult) == 'table' and profileResult.ok == true and profileResult.value or nil
+            fn = profile and profile.firstName or nil
+            ln = profile and profile.lastName or nil
+        end
+        row.owner_firstname = fn
+        row.owner_lastname = ln
+    end
+
+    local tx = GetAccountTransactions(accId)
+    cb(true, { account = row, transactions = tx or {} })
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:UnfreezeAccount', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] UnfreezeAccount denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local accId = NormalizeId(params and params.account)
+    if not accId then
+        devPrint('[ADMIN] UnfreezeAccount invalid account id:', params and params.account)
+        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local row = MySQL.query.await('SELECT owner_id, is_frozen FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
+    row = row and row[1] or nil
+    if not row then
+        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    if row.is_frozen == 0 or row.is_frozen == false then
+        cb(true)
+        return
+    end
+
+    local ownerId = NormalizeId(row.owner_id)
+    if ownerId then
+        SetOwnerAccountsFrozen(ownerId, false)
+    else
+        MySQL.query.await('UPDATE `bcc_accounts` SET `is_frozen` = 0 WHERE `id` = ?', { accId })
+    end
+
+    cb(true)
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetAccountFrozen', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] SetAccountFrozen denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local accId = NormalizeId(params and params.account)
+    local shouldFreeze = params and params.frozen
+    if not accId or type(shouldFreeze) ~= 'boolean' then
+        devPrint('[ADMIN] SetAccountFrozen invalid params:', params)
+        NotifyClient(src, _U('admin_invalid_account_freeze') or 'Invalid account/state.', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local row = MySQL.query.await('SELECT id FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
+    if not row or not row[1] then
+        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    MySQL.query.await('UPDATE `bcc_accounts` SET `is_frozen` = ? WHERE `id` = ?', { shouldFreeze and 1 or 0, accId })
+    cb(true, { is_frozen = shouldFreeze })
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:DeleteAccount', function(params, cb, src)
+    devPrint('[ADMIN] DeleteAccount called by src=', src, 'params=', params)
+
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] DeleteAccount denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local accId = NormalizeId(params and params.account)
+    if not accId then
+        devPrint('[ADMIN] DeleteAccount invalid account id:', params and params.account)
+        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    local row = GetAccount(accId)
+    if not row then
+        devPrint('[ADMIN] DeleteAccount failed: account not found for id', accId)
+        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        cb(false)
+        return
+    end
+
+    devPrint('[ADMIN] DeleteAccount removing account', accId, 'owner=', row.owner_id, 'cash=', row.cash, 'gold=', row.gold)
+    MySQL.query.await('DELETE FROM `bcc_accounts_access` WHERE `account_id` = ?', { accId })
+    MySQL.query.await('DELETE FROM `bcc_transactions` WHERE `account_id` = ?', { accId })
+    MySQL.query.await('DELETE FROM `bcc_accounts` WHERE `id` = ?', { accId })
+
+    devPrint('[ADMIN] DeleteAccount success for', accId)
+    cb(true)
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListLoans', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] ListLoans denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    if not bankId then
+        devPrint('[ADMIN] ListLoans invalid bank id:', params and params.bank)
+        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local rows = MySQL.query.await([[ 
+        SELECT l.*, 
+               a.name AS account_name,
+               a.account_number AS account_number,
+               a.owner_id AS account_owner_id
+        FROM `bcc_loans` AS l
+        LEFT JOIN `bcc_accounts` AS a ON l.account_id = a.id
+        WHERE l.bank_id = ?
+        ORDER BY l.created_at DESC
+    ]], { bankId })
+    attachLoanBorrowerNames(rows)
+    enrichLoanFinancials(rows)
+    cb(true, rows or {})
+end)
+
+-- List only pending loans by bank
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListPendingLoans', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] ListPendingLoans denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    if not bankId then
+        devPrint('[ADMIN] ListPendingLoans invalid bank id:', params and params.bank)
+        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local rows = MySQL.query.await([[ 
+        SELECT l.*, 
+               a.name AS account_name,
+               a.account_number AS account_number,
+               a.owner_id AS account_owner_id
+        FROM `bcc_loans` AS l
+        LEFT JOIN `bcc_accounts` AS a ON l.account_id = a.id
+        WHERE l.bank_id = ? AND LOWER(TRIM(l.status)) = 'pending'
+        ORDER BY l.created_at DESC
+    ]], { bankId })
+    attachLoanBorrowerNames(rows)
+    enrichLoanFinancials(rows)
+    cb(true, rows or {})
+end)
+
+-- Approve a loan
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ApproveLoan', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] ApproveLoan denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local loanId = NormalizeId(params and params.loan)
+    if not loanId then
+        NotifyClient(src, _U('admin_invalid_loan_id') or 'Invalid loan id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local user = GetBankingContext(src)
+    if not user then
+        NotifyClient(src, _U('error_character_not_found') or 'Character not found', 'error', 3500)
+        cb(false)
+        return
+    end
+    local approver = user.characterId
+    local res = ApproveLoan(loanId, approver)
+    if res and res.status then
+        sendLoanStatusMail(res.loan, 'approved')
+        local approverName = BccBanksInternal.getCharacterNameById(approver)
+        local lines = {
+            '**Action:** `Loan Approved`',
+            '**Loan ID:** `' .. tostring(loanId) .. '`',
+            '**Bank:** `' .. tostring(BccBanksInternal.getBankName(res.loan and res.loan.bank_id)) .. '`',
+            '**Borrower:** `' .. tostring(BccBanksInternal.getCharacterNameById(res.loan and res.loan.character_id)) .. '`',
+            '**Borrower Char ID:** `' .. tostring(res.loan and res.loan.character_id or 'Unknown') .. '`',
+            '**Amount:** `$' .. tostring(res.loan and res.loan.amount or 'Unknown') .. '`',
+            '**Approved By:** `' .. tostring(approverName) .. ' (' .. tostring(approver) .. ')`',
+        }
+        QueueBankAuditLog('Bank Loan Approved', lines, 3066993)
+        AddLoanTransaction(loanId, res.loan and res.loan.character_id, tonumber(res.loan and res.loan.amount) or 0, 'loan - approved', 'Loan approved by character #' .. tostring(approver))
+        NotifyClient(src, _U('admin_loan_approved') or 'Loan approved and disbursed.', 'success', 3000)
+        cb(true)
+    else
+        NotifyClient(src, (res and res.message) or _U('admin_failed_approve_loan') or 'Failed to approve loan.', 'error', 3500)
+        cb(false)
+    end
+end)
+
+-- Reject a loan
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:RejectLoan', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] RejectLoan denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local loanId = NormalizeId(params and params.loan)
+    if not loanId then
+        NotifyClient(src, _U('admin_invalid_loan_id') or 'Invalid loan id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local user = GetBankingContext(src)
+    if not user then
+        NotifyClient(src, _U('error_character_not_found') or 'Character not found', 'error', 3500)
+        cb(false)
+        return
+    end
+    local approver = user.characterId
+    local res = RejectLoan(loanId, approver)
+    if res and res.status then
+        sendLoanStatusMail(res.loan, 'rejected')
+        local approverName = BccBanksInternal.getCharacterNameById(approver)
+        local lines = {
+            '**Action:** `Loan Rejected`',
+            '**Loan ID:** `' .. tostring(loanId) .. '`',
+            '**Bank:** `' .. tostring(BccBanksInternal.getBankName(res.loan and res.loan.bank_id)) .. '`',
+            '**Borrower:** `' .. tostring(BccBanksInternal.getCharacterNameById(res.loan and res.loan.character_id)) .. '`',
+            '**Borrower Char ID:** `' .. tostring(res.loan and res.loan.character_id or 'Unknown') .. '`',
+            '**Amount:** `$' .. tostring(res.loan and res.loan.amount or 'Unknown') .. '`',
+            '**Rejected By:** `' .. tostring(approverName) .. ' (' .. tostring(approver) .. ')`',
+        }
+        QueueBankAuditLog('Bank Loan Rejected', lines, 15158332)
+        AddLoanTransaction(loanId, res.loan and res.loan.character_id, tonumber(res.loan and res.loan.amount) or 0, 'loan - rejected', 'Loan rejected by character #' .. tostring(approver))
+        NotifyClient(src, _U('admin_loan_rejected') or 'Loan rejected.', 'success', 3000)
+        cb(true)
+    else
+        NotifyClient(src, (res and res.message) or _U('admin_failed_reject_loan') or 'Failed to reject loan.', 'error', 3500)
+        cb(false)
+    end
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListSDBs', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        devPrint('[ADMIN] ListSDBs denied: no permission for src', src)
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    if not bankId then
+        devPrint('[ADMIN] ListSDBs invalid bank id:', params and params.bank)
+        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local rows = MySQL.query.await('SELECT id, name, owner_id, size FROM `bcc_safety_deposit_boxes` WHERE bank_id = ? ORDER BY id DESC', { bankId })
+    cb(true, rows or {})
+end)
+
+-- Legacy admin commands were removed in favor of the /bankadmin UI.
+
+-- Admin: Get/Set bank opening hours
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetHours', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    if not bankId then
+        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        cb(false)
+        return
+    end
+    local row = MySQL.query.await('SELECT hours_active, open_hour, close_hour FROM `bcc_banks` WHERE id = ? LIMIT 1', { bankId })
+    local data = row and row[1]
+    if not data then
+        cb(true, { hours_active = false, open_hour = nil, close_hour = nil })
+        return
+    end
+    cb(true, { hours_active = (data.hours_active == 1 or data.hours_active == true), open_hour = data.open_hour, close_hour = data.close_hour })
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetHours', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    local active = params and params.active
+    local openH = tonumber(params and params.open)
+    local closeH = tonumber(params and params.close)
+    if not bankId or openH == nil or closeH == nil then
+        NotifyClient(src, _U('admin_invalid_hours_input') or 'Enter valid bank id and hours.', 'error', 3500)
+        cb(false)
+        return
+    end
+    if openH < 0 or openH > 23 or closeH < 0 or closeH > 23 then
+        NotifyClient(src, _U('admin_hours_range_error') or 'Hours must be 0-23.', 'error', 3500)
+        cb(false)
+        return
+    end
+    local actv
+    if type(active) == 'boolean' then
+        actv = active and 1 or 0
+    elseif type(active) == 'number' then
+        actv = (active ~= 0) and 1 or 0
+    else
+        -- Keep current when not provided: fetch existing
+        local row = MySQL.query.await('SELECT hours_active FROM `bcc_banks` WHERE id = ? LIMIT 1', { bankId })
+        actv = (row and row[1] and (row[1].hours_active == 1 or row[1].hours_active == true)) and 1 or 0
+    end
+    MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ?, open_hour = ?, close_hour = ? WHERE id = ?', { actv, openH, closeH, bankId })
+    -- Notify all clients to refresh bank data
+    TriggerClientEvent('Feather:Banks:Refresh', -1)
+    local adminUser = GetBankingContext(src)
+    local adminId = adminUser and adminUser.characterId or 'Unknown'
+    local lines = {
+        '**Action:** `Bank Hours Updated`',
+        '**Bank:** `' .. tostring(BccBanksInternal.getBankName(bankId)) .. '`',
+        '**Hours Active:** `' .. tostring(actv == 1) .. '`',
+        '**Open Hour:** `' .. tostring(openH) .. '`',
+        '**Close Hour:** `' .. tostring(closeH) .. '`',
+        '**Admin:** `' .. tostring(BccBanksInternal.getCharacterNameById(adminId)) .. ' (' .. tostring(adminId) .. ')`',
+    }
+    QueueBankAuditLog('Bank Hours Updated', lines, 3447003)
+    cb(true)
+end)
+
+exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ToggleHours', function(params, cb, src)
+    if not IsBankAdmin(src) then
+        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        cb(false)
+        return
+    end
+    local bankId = NormalizeId(params and params.bank)
+    local active = params and params.active
+    if not bankId or type(active) ~= 'boolean' then
+        NotifyClient(src, _U('admin_invalid_hours_toggle') or 'Enter valid bank id and toggle.', 'error', 3500)
+        cb(false)
+        return
+    end
+    local actv = active and 1 or 0
+    MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ? WHERE id = ?', { actv, bankId })
+    TriggerClientEvent('Feather:Banks:Refresh', -1)
+    local adminUser = GetBankingContext(src)
+    local adminId = adminUser and adminUser.characterId or 'Unknown'
+    local lines = {
+        '**Action:** `Bank Hours Toggled`',
+        '**Bank:** `' .. tostring(BccBanksInternal.getBankName(bankId)) .. '`',
+        '**Hours Active:** `' .. tostring(active) .. '`',
+        '**Admin:** `' .. tostring(BccBanksInternal.getCharacterNameById(adminId)) .. ' (' .. tostring(adminId) .. ')`',
+    }
+    QueueBankAuditLog('Bank Hours Toggled', lines, 3447003)
+    cb(true)
+end)

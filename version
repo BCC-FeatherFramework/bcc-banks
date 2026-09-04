@@ -1,0 +1,18 @@
+<1.6.0>
+- Removed raw account UUID and bank UUID from the account details menu.
+- Added an admin button to view account transactions.
+- Improved the SDB creation page:
+  - replaced currency buttons with an arrow selector
+  - replaced size buttons with image-based size options
+- Added safety deposit box deletion with confirmation and inventory cleanup.
+- Added admin door open/close bypass for bank doors.
+- Added durable Audit-ready activity context for bank operations.
+- Added transaction log entries for more banking actions.
+- Updated `bcc_safety_deposit_boxes.inventory_id` to `CHAR(40)` for `sdb_` UUID inventory IDs.
+<1.5.2>
+- Fixed: resource restarts could leave an orphaned teller and spawn a duplicate NPC
+- Thanks to ImHerHela for bringing the loan issues to  our attention
+- Fixed: loan applications now upgrade older loan schemas with every required column
+- Fixed: bank and character interest-rate lookup safely falls back to the default rate
+- Fixed: accountless loan applications now create the dedicated loan account promised by the UI
+- Fixed: invalid loan durations and out-of-range interest rates are rejected
