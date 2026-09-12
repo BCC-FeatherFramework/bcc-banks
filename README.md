@@ -62,7 +62,7 @@ Requires the lockpick system dependency: https://github.com/guf1ck/lockpick-syst
 
 Main settings live in `BCC/bcc-banks/shared/config.lua`:
 
-- Language: set `defaultlang` to `'en_lang'`, `'ro_lang'`, `'pl_lang'`, `'es_lang'`, `'it_lang'`, `'fr_lang'`, or `'de_lang'`.
+- Language: handled entirely by Feather Core (default locale and per-account overrides). `languages/*.lua` registers each supported locale (`en_us`, `ro`, `pl`, `es`, `it`, `fr_fr`, `de`) via `Feather.Locale.register`.
 - Notifications are routed through Feather Core's named notification export.
 - Busy Banker: `UseBankerBusy = true` limits the teller UI to one player at a time. The lock is automatically released when the player closes the menu.
 - Prompts: `PromptSettings.Distance` and `TellerKey` (default G).

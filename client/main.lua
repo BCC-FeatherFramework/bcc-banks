@@ -4,30 +4,30 @@ Banks = {}
 
 RegisterCommand('banksReady', function(src, args, rawCommand)  -- correct param order
     devPrint("DEBUG: Registering command 'banksReady'.")
-    local ok; ok, Banks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
+    local ok; ok, Banks = exports['feather-core']:CallRPCAsync('bcc-banks:GetBanks', {})
     if not ok or not Banks or #Banks <= 0 then
         error('Unable to retrieve banks!')
         return
     end
 
     IsReady = true
-    TriggerEvent('Feather:Banks:Start')
-    devPrint("DEBUG: Banks are ready and Feather:Banks:Start triggered.")
+    TriggerEvent('bcc-banks:Start')
+    devPrint("DEBUG: Banks are ready and bcc-banks:Start triggered.")
 end, false)
 
 CreateThread(function()
     Wait(2000)
     devPrint("DEBUG: Initializing banks (auto instead of command).")
 
-    local ok; ok, Banks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
+    local ok; ok, Banks = exports['feather-core']:CallRPCAsync('bcc-banks:GetBanks', {})
     if not ok or not Banks or #Banks <= 0 then
         error('Unable to retrieve banks!')
         return
     end
 
     IsReady = true
-    TriggerEvent('Feather:Banks:Start')
-    devPrint("DEBUG: Banks are ready and Feather:Banks:Start triggered.")
+    TriggerEvent('bcc-banks:Start')
+    devPrint("DEBUG: Banks are ready and bcc-banks:Start triggered.")
 end)
 
 FeatherMenu = FeatherMenuV2Compat
@@ -53,18 +53,18 @@ FeatherBankMenu = FeatherMenu:RegisterMenu('feather:bank:menu', {
     end,
     closed = function()
     --DisplayRadar(true)
-    TriggerServerEvent('Feather:Banks:MenuClosed')
+    exports['feather-core']:NotifyRPC('bcc-banks:MenuClosed', {})
 end
 })
 
-RegisterNetEvent('Feather:Banks:Start', function()
+RegisterNetEvent('bcc-banks:Start', function()
     if IsBankLoopRunning then
         devPrint("DEBUG: Bank proximity loop is already running; ignoring duplicate start.")
         return
     end
 
     IsBankLoopRunning = true
-    devPrint("DEBUG: Feather:Banks:Start event triggered.")
+    devPrint("DEBUG: bcc-banks:Start event triggered.")
     BankOpen()
     BankClosed()
 
@@ -194,7 +194,7 @@ RegisterNetEvent('Feather:Banks:Start', function()
                     if GetOpenPrompt() then exports['feather-toolkit']:SetPromptEnabled(GetOpenPrompt(), false) end
                     local openTxt = tostring(bank.open_hour or '')
                     local closeTxt = tostring(bank.close_hour or '')
-                    local label = ( _U('bank_label') or 'Bank') .. (_U('hours') or ' is open from ~o~') .. openTxt .. (_U('to') or ':00~q~ to ~o~') .. closeTxt .. (_U('hundred') or ':00')
+                    local label = ( Feather.Locale.translateUpper('bank_label') or 'Bank') .. (Feather.Locale.translateUpper('hours') or ' is open from ~o~') .. openTxt .. (Feather.Locale.translateUpper('to') or ':00~q~ to ~o~') .. closeTxt .. (Feather.Locale.translateUpper('hundred') or ':00')
                     exports['feather-toolkit']:ShowPromptGroup(GetClosedPromptGroup(), label)
                     devPrint("DEBUG: Showing closed prompt for bank", bank.name, 'hours', openTxt, closeTxt)
                 else
@@ -240,9 +240,9 @@ AddEventHandler('onResourceStop', function(resourceName)
 end)
 
 -- Server-triggered refresh after admin changes (hours etc.)
-RegisterNetEvent('Feather:Banks:Refresh', function()
+RegisterNetEvent('bcc-banks:Refresh', function()
     devPrint("DEBUG: Refresh event received; reloading banks.")
-    local ok, refreshedBanks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
+    local ok, refreshedBanks = exports['feather-core']:CallRPCAsync('bcc-banks:GetBanks', {})
     if not ok or not refreshedBanks then
         devPrint("DEBUG: Refresh failed to load banks.")
         return

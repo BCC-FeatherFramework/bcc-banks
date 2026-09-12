@@ -102,7 +102,7 @@ local function sendDailyReminder(loanRow, info, elapsedDays, dueDays)
     end
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetLoans', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetLoans', function(params, cb, src)
     devPrint('GetLoans RPC called. src=', src, 'params=', params)
 
     local account_id = NormalizeId(params and params.account)
@@ -110,19 +110,19 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetLoans', function(params, c
 
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local characterId = char.characterId
     if not characterId then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
@@ -130,7 +130,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetLoans', function(params, c
     local list
     if account_id then
         if not (HasAccountAccess(account_id, characterId) or IsAccountOwner(account_id, characterId)) then
-            NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
             cb(false)
             return
         end
@@ -138,13 +138,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetLoans', function(params, c
     elseif bank_id then
         list = GetLoansForCharacterBank(characterId, bank_id)
     else
-        NotifyClient(src, _U('error_invalid_bank') or 'Invalid bank.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_bank') or 'Invalid bank.', 'error', 4000)
         cb(false)
         return
     end
     local targetBankId = bank_id or GetBankIdForAccount(account_id)
     if not targetBankId or not IsPlayerNearBank(src, targetBankId) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -156,55 +156,55 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetLoans', function(params, c
     cb(true, list)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetLoan', function(params, cb, src)
     local loan_id = NormalizeId(params and params.loan)
     if not loan_id then
-        NotifyClient(src, _U('error_invalid_loan_id'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_loan_id'), 'error', 4000)
         cb(false)
         return
     end
     local loan = GetLoan(loan_id)
     if not canViewLoan(src, loan) then
-        NotifyClient(src, _U('error_no_permission'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), 'error', 4000)
         cb(false)
         return
     end
     if not IsBankAdmin(src) and not IsPlayerNearBank(src, loan.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
     local info = ComputeLoanOutstanding(loan_id)
     if not info then
-        NotifyClient(src, _U('error_loan_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_loan_not_found'), 'error', 4000)
         cb(false)
         return
     end
     cb(true, info)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetLoanTransactions', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetLoanTransactions', function(params, cb, src)
     local loan_id = NormalizeId(params and params.loan)
     if not loan_id then
-        NotifyClient(src, _U('error_invalid_loan_id'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_loan_id'), 'error', 4000)
         cb(false)
         return
     end
 
     local loan = GetLoan(loan_id)
     if not loan then
-        NotifyClient(src, _U('error_loan_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_loan_not_found'), 'error', 4000)
         cb(false)
         return
     end
 
     if not canViewLoan(src, loan) then
-        NotifyClient(src, _U('error_no_permission'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), 'error', 4000)
         cb(false)
         return
     end
     if not IsBankAdmin(src) and not IsPlayerNearBank(src, loan.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -218,16 +218,16 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetLoanTransactions', functio
     cb(true, transactions or {})
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:ClaimLoanDisbursement', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:ClaimLoanDisbursement', function(params, cb, src)
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char or not char.characterId then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
@@ -236,25 +236,25 @@ exports['feather-core']:RegisterRPC('Feather:Banks:ClaimLoanDisbursement', funct
     local loan_id    = NormalizeId(params and params.loan)
     local account_id = NormalizeId(params and params.account)
     if not loan_id or not account_id then
-        NotifyClient(src, _U('error_invalid_input'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), 'error', 4000)
         cb(false)
         return
     end
 
     local claimLoan = GetLoan(loan_id)
     if not claimLoan or not IsPlayerNearBank(src, claimLoan.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
 
     local res = ClaimLoanToAccount(loan_id, account_id, characterId)
     if not res or res.status == false then
-        NotifyClient(src, (res and res.message) or _U('error_unable_create_loan'), 'error', 4000)
+        NotifyClient(src, (res and res.message) or Feather.Locale.translateUpper('error_unable_create_loan'), 'error', 4000)
         cb(false)
         return
     end
-    NotifyClient(src, _U('success_loan_disbursed') or 'Loan funds transferred to account.', 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_loan_disbursed') or 'Loan funds transferred to account.', 'success', 4000)
     local loan = res.loan or {}
     local lines = {
         '**Action:** `Loan Disbursement Claimed`',
@@ -268,24 +268,24 @@ exports['feather-core']:RegisterRPC('Feather:Banks:ClaimLoanDisbursement', funct
     cb(true, res.loan)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:CreateLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:CreateLoan', function(params, cb, src)
     devPrint('CreateLoan RPC called. src=', src, 'params=', params)
 
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local characterId = char.characterId
     if not characterId then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
@@ -297,7 +297,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateLoan', function(params,
 
     if (not account_id and not bankId) or not IsFinitePositiveNumber(amount)
         or not IsFinitePositiveNumber(duration) or duration % 1 ~= 0 or duration > 120 then
-        NotifyClient(src, _U('error_invalid_input'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), 'error', 4000)
         cb(false)
         return
     end
@@ -306,18 +306,18 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateLoan', function(params,
     if account_id then
         bankId = bankId or GetBankIdForAccount(account_id)
         if not (IsAccountOwner(account_id, characterId) or IsAccountAdmin(account_id, characterId)) then
-            NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
             cb(false)
             return
         end
     elseif not bankId then
-        NotifyClient(src, _U('error_invalid_bank') or 'Invalid bank.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_bank') or 'Invalid bank.', 'error', 4000)
         cb(false)
         return
     end
 
     if not IsPlayerNearBank(src, bankId) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -327,9 +327,9 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateLoan', function(params,
     -- the loan, then roll it back if the loan insert fails.
     local autoCreatedAccountId
     if not account_id then
-        local accountResult = CreateAccountReturn(_U('loan_account_default_name') or 'Loan Account', characterId, bankId)
+        local accountResult = CreateAccountReturn(Feather.Locale.translateUpper('loan_account_default_name') or 'Loan Account', characterId, bankId)
         if not accountResult or accountResult.status == false or not accountResult.account then
-            NotifyClient(src, (accountResult and accountResult.message) or _U('error_unable_create_loan'), 'error', 4000)
+            NotifyClient(src, (accountResult and accountResult.message) or Feather.Locale.translateUpper('error_unable_create_loan'), 'error', 4000)
             cb(false)
             return
         end
@@ -345,13 +345,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateLoan', function(params,
             MySQL.query.await('DELETE FROM `bcc_accounts_access` WHERE `account_id` = ?', { autoCreatedAccountId })
             MySQL.query.await('DELETE FROM `bcc_accounts` WHERE `id` = ? AND `cash` = 0 AND `gold` = 0', { autoCreatedAccountId })
         end
-        NotifyClient(src, res and res.message or _U('error_unable_create_loan'), 'error', 4000)
+        NotifyClient(src, res and res.message or Feather.Locale.translateUpper('error_unable_create_loan'), 'error', 4000)
         cb(false)
         return
     end
 
     -- Inform user that the loan application is pending approval
-    NotifyClient(src, _U('success_loan_created') or 'Loan application submitted for approval.', 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_loan_created') or 'Loan application submitted for approval.', 'success', 4000)
     local loan = res.loan or {}
     local lines = {
         '**Action:** `Loan Created`',
@@ -369,34 +369,34 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateLoan', function(params,
     cb(true, res.loan)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetLoanRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetLoanRate', function(params, cb, src)
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local characterId = char.characterId
     if not characterId then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local account_id = NormalizeId(params and params.account)
     if account_id and not (HasAccountAccess(account_id, characterId) or IsAccountOwner(account_id, characterId)) then
-        NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
         cb(false)
         return
     end
     local bankId = account_id and GetBankIdForAccount(account_id) or NormalizeId(params and params.bank)
     if not bankId or not IsPlayerNearBank(src, bankId) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -457,24 +457,24 @@ CreateThread(function()
     end
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:RepayLoan', function(params, cb, src)
     devPrint('RepayLoan RPC called. src=', src, 'params=', params)
 
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local characterId = char.characterId
     if not characterId then
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
@@ -483,7 +483,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, 
     local amount    = tonumber(params and params.amount)
 
     if not loan_id or not IsFinitePositiveNumber(amount) then
-        NotifyClient(src, _U('error_invalid_input'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), 'error', 4000)
         cb(false)
         return
     end
@@ -491,42 +491,42 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, 
     -- Prevent repayment of loans that are not approved yet
     local loanRow = GetLoan(loan_id)
     if not loanRow then
-        NotifyClient(src, _U('error_loan_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_loan_not_found'), 'error', 4000)
         cb(false)
         return
     end
 
     if not IsPlayerNearBank(src, loanRow.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
     local status = tostring(loanRow.status)
     local isDefaulted = status == 'defaulted' or tonumber(loanRow.is_defaulted) == 1
     if status == 'paid' then
-        NotifyClient(src, _U('error_loan_already_paid') or 'Loan already fully repaid.', 'success', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_loan_already_paid') or 'Loan already fully repaid.', 'success', 4000)
         cb(false)
         return
     elseif status ~= 'approved' and not isDefaulted then
-        NotifyClient(src, _U('error_loan_not_approved') or 'Loan has not been approved yet.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_loan_not_approved') or 'Loan has not been approved yet.', 'error', 4000)
         cb(false)
         return
     end
 
     if not IdsEqual(loanRow.character_id, characterId) then
-        NotifyClient(src, _U('error_no_permission') or 'No permission.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission') or 'No permission.', 'error', 4000)
         cb(false)
         return
     end
     if ActiveLoanRepayments[loan_id] then
-        NotifyClient(src, _U('error_loan_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_loan_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
     ActiveLoanRepayments[loan_id] = true
     if not AcquirePlayerFinancialLock(src) then
         ActiveLoanRepayments[loan_id] = nil
-        NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
@@ -535,7 +535,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, 
     local info = ComputeLoanOutstanding(loan_id)
     if info and info.outstanding then
         if info.outstanding <= 0 then
-            NotifyClient(src, _U('error_loan_already_paid') or 'Loan already fully repaid.', 'success', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_loan_already_paid') or 'Loan already fully repaid.', 'success', 4000)
             ReleasePlayerFinancialLock(src)
             ActiveLoanRepayments[loan_id] = nil
             cb(false)
@@ -547,7 +547,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, 
     end
 
     if not amount or amount <= 0 then
-        NotifyClient(src, _U('invalid_repay_amount') or 'Enter a valid repayment amount.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('invalid_repay_amount') or 'Enter a valid repayment amount.', 'error', 4000)
         ReleasePlayerFinancialLock(src)
         ActiveLoanRepayments[loan_id] = nil
         cb(false)
@@ -557,7 +557,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, 
     -- Check player has enough cash and remove it
     local currentDollars = tonumber(char.money) or 0
     if currentDollars < amount then
-        NotifyClient(src, _U('error_not_enough_cash', tostring(currentDollars)) or 'Not enough cash.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash', tostring(currentDollars)) or 'Not enough cash.', 'error', 4000)
         ReleasePlayerFinancialLock(src)
         ActiveLoanRepayments[loan_id] = nil
         cb(false)
@@ -567,13 +567,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, 
     if not removed then
         ReleasePlayerFinancialLock(src)
         ActiveLoanRepayments[loan_id] = nil
-        NotifyClient(src, _U('error_unable_repay_loan'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_repay_loan'), 'error', 4000)
         cb(false)
         return
     end
 
     -- Record the repayment against the loan
-    local repayDesc = _U and _U('loan_repayment_cash_desc') or 'Loan repayment from character cash'
+    local repayDesc = _U and Feather.Locale.translateUpper('loan_repayment_cash_desc') or 'Loan repayment from character cash'
     AddLoanTransaction(loan_id, characterId, amount, 'loan - repayment', repayDesc)
 
     -- If fully repaid now, mark loan as paid
@@ -591,7 +591,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RepayLoan', function(params, 
         end
     end
 
-    NotifyClient(src, _U('success_loan_repaid'), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_loan_repaid'), 'success', 4000)
     local remaining = after and after.outstanding or nil
     local lines = {
         '**Action:** `Loan Repaid`',

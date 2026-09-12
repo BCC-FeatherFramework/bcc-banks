@@ -3,47 +3,47 @@ function OpenWithdrawDepositPage(account, actionType, parentPage)
     local WithdrawDepositPage = FeatherBankMenu:RegisterPage(pageName)
 
     local titles = {
-        deposit  = _U("deposit_title"),
-        withdraw = _U("withdraw_title")
+        deposit  = Feather.Locale.translateUpper("deposit_title"),
+        withdraw = Feather.Locale.translateUpper("withdraw_title")
     }
 
-    local headerTitle = titles[actionType] or _U("transaction_title")
+    local headerTitle = titles[actionType] or Feather.Locale.translateUpper("transaction_title")
 
     WithdrawDepositPage:RegisterElement("header", {
-        value = headerTitle .. " " .. _U("cash_gold_header"),
+        value = headerTitle .. " " .. Feather.Locale.translateUpper("cash_gold_header"),
         slot  = "header"
     })
 
     local cashValue = ''
     WithdrawDepositPage:RegisterElement("input", {
-        label       = _U("cash_amount_label"),
-        placeholder = _U("cash_amount_placeholder"),
+        label       = Feather.Locale.translateUpper("cash_amount_label"),
+        placeholder = Feather.Locale.translateUpper("cash_amount_placeholder"),
         style       = {}
     }, function(data)
         cashValue = data.value
     end)
 
     WithdrawDepositPage:RegisterElement("button", {
-        label = headerTitle .. " " .. _U("cash_button"),
+        label = headerTitle .. " " .. Feather.Locale.translateUpper("cash_button"),
         style = {}
     }, function()
         local cashAmt = tonumber(cashValue)
         if not cashAmt or cashAmt <= 0 then
-            Notify(_U("invalid_cash_amount"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_cash_amount"), 4000)
             return
         end
 
         if actionType == "deposit" then
-            exports['feather-core']:CallRPCAsync("Feather:Banks:DepositCash", {
+            exports['feather-core']:CallRPCAsync("bcc-banks:DepositCash", {
                 account     = account.id,
                 amount      = cashAmt,
-                description = _U("deposit_cash_description")
+                description = Feather.Locale.translateUpper("deposit_cash_description")
             })
         else
-            exports['feather-core']:CallRPCAsync("Feather:Banks:WithdrawCash", {
+            exports['feather-core']:CallRPCAsync("bcc-banks:WithdrawCash", {
                 account     = account.id,
                 amount      = cashAmt,
-                description = _U("withdraw_cash_description")
+                description = Feather.Locale.translateUpper("withdraw_cash_description")
             })
         end
 
@@ -59,34 +59,34 @@ function OpenWithdrawDepositPage(account, actionType, parentPage)
 
     local goldValue = ''
     WithdrawDepositPage:RegisterElement("input", {
-        label       = _U("gold_amount_label"),
-        placeholder = _U("gold_amount_placeholder"),
+        label       = Feather.Locale.translateUpper("gold_amount_label"),
+        placeholder = Feather.Locale.translateUpper("gold_amount_placeholder"),
         style       = {}
     }, function(data)
         goldValue = data.value
     end)
 
     WithdrawDepositPage:RegisterElement("button", {
-        label = headerTitle .. " " .. _U("gold_button"),
+        label = headerTitle .. " " .. Feather.Locale.translateUpper("gold_button"),
         style = {}
     }, function()
         local goldAmt = tonumber(goldValue)
         if not goldAmt or goldAmt <= 0 then
-            Notify(_U("invalid_gold_amount"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_gold_amount"), 4000)
             return
         end
 
         if actionType == "deposit" then
-            exports['feather-core']:CallRPCAsync("Feather:Banks:DepositGold", {
+            exports['feather-core']:CallRPCAsync("bcc-banks:DepositGold", {
                 account     = account.id,
                 amount      = goldAmt,
-                description = _U("deposit_gold_description")
+                description = Feather.Locale.translateUpper("deposit_gold_description")
             })
         else
-            exports['feather-core']:CallRPCAsync("Feather:Banks:WithdrawGold", {
+            exports['feather-core']:CallRPCAsync("bcc-banks:WithdrawGold", {
                 account     = account.id,
                 amount      = goldAmt,
-                description = _U("withdraw_gold_description")
+                description = Feather.Locale.translateUpper("withdraw_gold_description")
             })
         end
 
@@ -100,7 +100,7 @@ function OpenWithdrawDepositPage(account, actionType, parentPage)
     })
 
     WithdrawDepositPage:RegisterElement("button", {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()

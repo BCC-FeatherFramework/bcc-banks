@@ -16,7 +16,7 @@ local function roundTo(value, decimals)
     return math.floor((value * power) + 0.5) / power
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetGoldRates', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetGoldRates', function(params, cb, src)
     if not canUseGoldExchange(src) then cb(false) return end
     local buy, sell = getRates()
     cb(true, { buy = buy, sell = sell })
@@ -25,11 +25,11 @@ end)
 -- params: { gold = number } OR { cash = number }
 -- If gold provided: buy that much gold.
 -- If cash provided: convert all cash to gold at buy rate.
-exports['feather-core']:RegisterRPC('Feather:Banks:BuyGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:BuyGold', function(params, cb, src)
     devPrint('BuyGold RPC called. src=', src, 'params=', params)
 
     if not canUseGoldExchange(src) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -37,14 +37,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:BuyGold', function(params, cb
     local user = GetBankingContext(src)
     if not user then
         devPrint('BuyGold: invalid player/char')
-        NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint('BuyGold: invalid player/char')
-        NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
@@ -55,7 +55,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:BuyGold', function(params, cb
     local cash = tonumber(params and params.cash)
 
     if (not IsFinitePositiveNumber(gold)) and (not IsFinitePositiveNumber(cash)) then
-        NotifyClient(src, _U('error_invalid_gold_or_cash_amount'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_gold_or_cash_amount'), 'error', 4000)
         cb(false)
         return
     end
@@ -66,7 +66,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:BuyGold', function(params, cb
 
     gold = roundTo(gold or 0, 2)
     if gold <= 0 then
-        NotifyClient(src, _U('error_amount_zero'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_amount_zero'), 'error', 4000)
         cb(false)
         return
     end
@@ -77,13 +77,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:BuyGold', function(params, cb
     devPrint('BuyGold: gold=', gold, 'cost=', cost, 'wallet=$', currentDollars)
 
     if currentDollars < cost then
-        NotifyClient(src, _U('error_not_enough_cash_purchase'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash_purchase'), 'error', 4000)
         cb(false)
         return
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
@@ -106,18 +106,18 @@ exports['feather-core']:RegisterRPC('Feather:Banks:BuyGold', function(params, cb
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Gold Exchange Purchase', lines, 15844367)
     AddCharacterTransaction(char.characterId, cost, 'gold exchange - buy', 'Bought ' .. tostring(gold) .. ' gold for $' .. tostring(cost))
-    NotifyClient(src, _U('success_purchased_gold_for_cash', tostring(gold), tostring(cost)), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_purchased_gold_for_cash', tostring(gold), tostring(cost)), 'success', 4000)
     cb(true, { gold = gold, cost = cost })
 end)
 
 -- params: { gold = number } OR { cash = number }
 -- If gold provided: sell that much gold.
 -- If cash provided: sell enough gold to receive that much cash.
-exports['feather-core']:RegisterRPC('Feather:Banks:SellGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:SellGold', function(params, cb, src)
     devPrint('SellGold RPC called. src=', src, 'params=', params)
 
     if not canUseGoldExchange(src) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -125,14 +125,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:SellGold', function(params, c
     local user = GetBankingContext(src)
     if not user then
         devPrint('SellGold: invalid player/char')
-        NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint('SellGold: invalid player/char')
-        NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
@@ -143,7 +143,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:SellGold', function(params, c
     local cash = tonumber(params and params.cash)
 
     if (not IsFinitePositiveNumber(gold)) and (not IsFinitePositiveNumber(cash)) then
-        NotifyClient(src, _U('error_invalid_gold_or_cash_amount'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_gold_or_cash_amount'), 'error', 4000)
         cb(false)
         return
     end
@@ -154,7 +154,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:SellGold', function(params, c
 
     gold = roundTo(gold or 0, 2)
     if gold <= 0 then
-        NotifyClient(src, _U('error_amount_zero'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_amount_zero'), 'error', 4000)
         cb(false)
         return
     end
@@ -165,13 +165,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:SellGold', function(params, c
     devPrint('SellGold: gold=', gold, 'proceeds=$', proceeds, 'wallet gold=', currentGold)
 
     if currentGold < gold then
-        NotifyClient(src, _U('error_not_enough_gold_to_sell'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_gold_to_sell'), 'error', 4000)
         cb(false)
         return
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
@@ -194,17 +194,17 @@ exports['feather-core']:RegisterRPC('Feather:Banks:SellGold', function(params, c
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Gold Exchange Sale', lines, 15105570)
     AddCharacterTransaction(char.characterId, proceeds, 'gold exchange - sell', 'Sold ' .. tostring(gold) .. ' gold for $' .. tostring(proceeds))
-    NotifyClient(src, _U('success_sold_gold_for_cash', tostring(gold), tostring(proceeds)), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_sold_gold_for_cash', tostring(gold), tostring(proceeds)), 'success', 4000)
     cb(true, { gold = gold, cash = proceeds })
 end)
 
 -- Exchange inventory gold bar items into gold currency
 -- params: { count = number }
-exports['feather-core']:RegisterRPC('Feather:Banks:ExchangeGoldBars', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:ExchangeGoldBars', function(params, cb, src)
     devPrint('ExchangeGoldBars RPC called. src=', src, 'params=', params)
 
     if not canUseGoldExchange(src) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -212,7 +212,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:ExchangeGoldBars', function(p
     local user = GetBankingContext(src)
     if not user then
         devPrint('ExchangeGoldBars: invalid user/char')
-        NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
@@ -220,7 +220,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:ExchangeGoldBars', function(p
 
     local count = tonumber(params and params.count) or 0
     if not IsFinitePositiveNumber(count) or count % 1 ~= 0 then
-        NotifyClient(src, _U('error_invalid_goldbar_count'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_goldbar_count'), 'error', 4000)
         cb(false)
         return
     end
@@ -233,13 +233,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:ExchangeGoldBars', function(p
     local countResult = inventory.Items.GetItemCount(itemName, src)
     local had = type(countResult) == 'table' and countResult.ok == true and tonumber(countResult.value) or 0
     if had < count then
-        NotifyClient(src, _U('error_not_enough_goldbars'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_goldbars'), 'error', 4000)
         cb(false)
         return
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
@@ -279,7 +279,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:ExchangeGoldBars', function(p
         end
         return s
     end
-    NotifyClient(src, _U('success_exchanged_goldbars', tostring(count), toFixed(netGold, 2)), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_exchanged_goldbars', tostring(count), toFixed(netGold, 2)), 'success', 4000)
     local lines = {
         '**Action:** `Exchange Gold Bars`',
         '**Item:** `' .. tostring(itemName) .. '`',

@@ -291,5 +291,5 @@ CreateThread(function()
 
     BccBanksDatabaseReady = true
     devPrint("Database tables for *bcc-banks* created successfully.")
-    TriggerEvent('Feather:Banks:DatabaseReady', checkItemReady)
+    TriggerEvent('bcc-banks:DatabaseReady', checkItemReady)
 end)

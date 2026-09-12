@@ -1,4 +1,4 @@
-Locales["de_lang"] = {
+Feather.Locale.register("de", {
     bank_label = "Bank",
     door_prompt_group = "Tuer",
     door_open_prompt = "Tuer oeffnen",
@@ -524,4 +524,4 @@ Locales["de_lang"] = {
     error_loan_operation_busy = "Dieses Darlehen wird bereits aktualisiert. Bitte versuchen Sie es erneut.",
     error_financial_operation_busy = "Ein anderer Finanzvorgang läuft bereits. Bitte versuchen Sie es erneut.",
     error_unable_withdraw = "Die Auszahlung konnte nicht abgeschlossen werden.",
-}
+})

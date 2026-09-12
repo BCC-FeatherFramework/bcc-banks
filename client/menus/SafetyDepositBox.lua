@@ -1,26 +1,26 @@
 function OpenSDBListPage(bank, ParentPage)
     local SDBListPage = FeatherBankMenu:RegisterPage('bank:page:sdb:list:' .. tostring(bank.id) .. ':' .. tostring(GetGameTimer()))
     SDBListPage:RegisterElement('header', {
-        value = _U("sdb_list_header"),
+        value = Feather.Locale.translateUpper("sdb_list_header"),
         slot  = 'header'
     })
     SDBListPage:RegisterElement('subheader', {
-        value = _U("sdb_list_subheader"),
+        value = Feather.Locale.translateUpper("sdb_list_subheader"),
         slot  = 'header'
     })
     SDBListPage:RegisterElement('line', {
         slot  = 'header',
         style = {}
     })
-    local ok, boxes = exports['feather-core']:CallRPCAsync('Feather:Banks:GetSDBs', { bank = bank.id })
+    local ok, boxes = exports['feather-core']:CallRPCAsync('bcc-banks:GetSDBs', { bank = bank.id })
     if not ok or not boxes or #boxes == 0 then
         SDBListPage:RegisterElement('textdisplay', {
-            value = _U("no_boxes_found"),
+            value = Feather.Locale.translateUpper("no_boxes_found"),
             slot  = 'content'
         })
     else
         for _, box in ipairs(boxes) do
-            local label = (box.name or _U("box_default_name", tostring(box.id)))
+            local label = (box.name or Feather.Locale.translateUpper("box_default_name", tostring(box.id)))
             SDBListPage:RegisterElement('button', {
                 label = label,
                 style = {}
@@ -37,14 +37,14 @@ function OpenSDBListPage(bank, ParentPage)
         style = {}
     })
     SDBListPage:RegisterElement('button', {
-        label = _U("create_new_box_button"),
+        label = Feather.Locale.translateUpper("create_new_box_button"),
         slot  = 'footer',
         style = {}
     }, function()
         OpenCreateSDBPage(bank, SDBListPage)
     end)
     SDBListPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = 'footer',
         style = {}
     }, function()
@@ -60,11 +60,11 @@ end
 function OpenSDBBoxMenu(box, ParentPage, SDBListPage, bank)
     local SDBoxPage = FeatherBankMenu:RegisterPage('bank:page:sdb:box:' .. tostring(box.id))
     SDBoxPage:RegisterElement('header', {
-        value = _U("sdb_box_header"),
+        value = Feather.Locale.translateUpper("sdb_box_header"),
         slot  = 'header'
     })
     SDBoxPage:RegisterElement('subheader', {
-        value = _U("sdb_box_subheader"),
+        value = Feather.Locale.translateUpper("sdb_box_subheader"),
         slot  = 'header'
     })
     SDBoxPage:RegisterElement('line', {
@@ -72,19 +72,19 @@ function OpenSDBBoxMenu(box, ParentPage, SDBListPage, bank)
         style = {}
     })
     SDBoxPage:RegisterElement('button', {
-        label = _U("open_box_button"),
+        label = Feather.Locale.translateUpper("open_box_button"),
         style = {}
     }, function()
         OpenSDBInventory(box, ParentPage)
     end)
     SDBoxPage:RegisterElement('button', {
-        label = _U("manage_access_button"),
+        label = Feather.Locale.translateUpper("manage_access_button"),
         style = {}
     }, function()
         OpenSDBAccessMenu(box, ParentPage, SDBListPage)
     end)
     SDBoxPage:RegisterElement('button', {
-        label = _U("delete_sdb_button"),
+        label = Feather.Locale.translateUpper("delete_sdb_button"),
         style = {}
     }, function()
         OpenSDBDeleteConfirmPage(box, SDBoxPage, SDBListPage, bank)
@@ -94,7 +94,7 @@ function OpenSDBBoxMenu(box, ParentPage, SDBListPage, bank)
         style = {}
     })
     SDBoxPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = 'footer',
         style = {}
     }, function()
@@ -110,7 +110,7 @@ end
 function OpenSDBDeleteConfirmPage(box, ParentPage, SDBListPage, bank)
     local DeletePage = FeatherBankMenu:RegisterPage('sdb:page:delete:' .. tostring(box.id))
     local hasInventoryItems = false
-    local infoOk, deleteInfo = exports['feather-core']:CallRPCAsync('Feather:Banks:GetSDBDeleteInfo', {
+    local infoOk, deleteInfo = exports['feather-core']:CallRPCAsync('bcc-banks:GetSDBDeleteInfo', {
         sdb_id = NormalizeId(box.id)
     })
     if infoOk and deleteInfo and deleteInfo.hasItems then
@@ -118,7 +118,7 @@ function OpenSDBDeleteConfirmPage(box, ParentPage, SDBListPage, bank)
     end
 
     DeletePage:RegisterElement('header', {
-        value = _U("confirm_delete_sdb_header"),
+        value = Feather.Locale.translateUpper("confirm_delete_sdb_header"),
         slot  = 'header'
     })
     DeletePage:RegisterElement('line', {
@@ -127,15 +127,15 @@ function OpenSDBDeleteConfirmPage(box, ParentPage, SDBListPage, bank)
     })
     DeletePage:RegisterElement('textdisplay', {
         value = hasInventoryItems
-            and _U("confirm_delete_sdb_text_with_items", box.name or tostring(box.id))
-            or _U("confirm_delete_sdb_text", box.name or tostring(box.id)),
+            and Feather.Locale.translateUpper("confirm_delete_sdb_text_with_items", box.name or tostring(box.id))
+            or Feather.Locale.translateUpper("confirm_delete_sdb_text", box.name or tostring(box.id)),
         slot  = 'content'
     })
     DeletePage:RegisterElement('button', {
-        label = _U("confirm_delete_sdb_button"),
+        label = Feather.Locale.translateUpper("confirm_delete_sdb_button"),
         style = {}
     }, function()
-        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:DeleteSDB', {
+        local ok = exports['feather-core']:CallRPCAsync('bcc-banks:DeleteSDB', {
             sdb_id = NormalizeId(box.id)
         })
         if ok then
@@ -147,7 +147,7 @@ function OpenSDBDeleteConfirmPage(box, ParentPage, SDBListPage, bank)
         style = {}
     })
     DeletePage:RegisterElement('button', {
-        label = _U("cancel_button"),
+        label = Feather.Locale.translateUpper("cancel_button"),
         slot  = 'footer',
         style = {}
     }, function()
@@ -163,11 +163,11 @@ end
 function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initialSize)
     local CreateSDBPage = FeatherBankMenu:RegisterPage('bank:page:sdb:create:' .. tostring(bank.id))
     CreateSDBPage:RegisterElement('header', {
-        value = _U("create_sdb_header"),
+        value = Feather.Locale.translateUpper("create_sdb_header"),
         slot  = 'header'
     })
     CreateSDBPage:RegisterElement('subheader', {
-        value = _U("create_sdb_subheader"),
+        value = Feather.Locale.translateUpper("create_sdb_subheader"),
         slot  = 'header'
     })
     CreateSDBPage:RegisterElement('line', {
@@ -177,8 +177,8 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
     local sdbName = initialName or ''
     local sdbSize = initialSize or 'Small'
     CreateSDBPage:RegisterElement('input', {
-        label       = _U("box_name_label"),
-        placeholder = (sdbName ~= '' and sdbName) or _U("box_name_placeholder"),
+        label       = Feather.Locale.translateUpper("box_name_label"),
+        placeholder = (sdbName ~= '' and sdbName) or Feather.Locale.translateUpper("box_name_placeholder"),
         style       = {}
     }, function(data)
         sdbName = data.value
@@ -188,15 +188,15 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
     -- Choose payment currency
     local payWith = (selectedPayWith == 'gold') and 'gold' or 'cash'
     CreateSDBPage:RegisterElement('arrows', {
-        label = _U('sdb_select_payment'),
+        label = Feather.Locale.translateUpper('sdb_select_payment'),
         start = (payWith == 'gold') and 2 or 1,
         options = {
             {
-                display = _U('sdb_pay_cash'),
+                display = Feather.Locale.translateUpper('sdb_pay_cash'),
                 extra = 'cash'
             },
             {
-                display = _U('sdb_pay_gold'),
+                display = Feather.Locale.translateUpper('sdb_pay_gold'),
                 extra = 'gold'
             }
         },
@@ -205,7 +205,7 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
     }, function(data)
         local selected = data and data.value and data.value.extra
         if selected and selected ~= payWith then
-            Notify(selected == 'gold' and _U('sdb_payment_gold_selected') or _U('sdb_payment_cash_selected'), 1500)
+            Notify(selected == 'gold' and Feather.Locale.translateUpper('sdb_payment_gold_selected') or Feather.Locale.translateUpper('sdb_payment_cash_selected'), 1500)
             OpenCreateSDBPage(bank, ParentPage, selected, sdbName, sdbSize)
         end
     end)
@@ -218,23 +218,23 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
     local largeSlots  = tonumber(sizes.Large  and sizes.Large.MaxWeight)  or 0
 
     CreateSDBPage:RegisterElement('arrows', {
-        label = _U('select_size_text'),
+        label = Feather.Locale.translateUpper('select_size_text'),
         start = sdbSize == 'Large' and 3 or (sdbSize == 'Medium' and 2 or 1),
         options = {
             {
-                display = (_U('size_small_button') or 'Small') .. ' - ' .. tostring(smallSlots) .. ' slots - ' ..
+                display = (Feather.Locale.translateUpper('size_small_button') or 'Small') .. ' - ' .. tostring(smallSlots) .. ' slots - ' ..
                     (payWith == 'gold' and (tostring(tonumber(sizes.Small and sizes.Small.GoldPrice or 0) or 0) .. ' gold')
                         or ('$' .. tostring(tonumber(sizes.Small and sizes.Small.CashPrice or 0) or 0))),
                 extra = 'Small'
             },
             {
-                display = (_U('size_medium_button') or 'Medium') .. ' - ' .. tostring(mediumSlots) .. ' slots - ' ..
+                display = (Feather.Locale.translateUpper('size_medium_button') or 'Medium') .. ' - ' .. tostring(mediumSlots) .. ' slots - ' ..
                     (payWith == 'gold' and (tostring(tonumber(sizes.Medium and sizes.Medium.GoldPrice or 0) or 0) .. ' gold')
                         or ('$' .. tostring(tonumber(sizes.Medium and sizes.Medium.CashPrice or 0) or 0))),
                 extra = 'Medium'
             },
             {
-                display = (_U('size_large_button') or 'Large') .. ' - ' .. tostring(largeSlots) .. ' slots - ' ..
+                display = (Feather.Locale.translateUpper('size_large_button') or 'Large') .. ' - ' .. tostring(largeSlots) .. ' slots - ' ..
                     (payWith == 'gold' and (tostring(tonumber(sizes.Large and sizes.Large.GoldPrice or 0) or 0) .. ' gold')
                         or ('$' .. tostring(tonumber(sizes.Large and sizes.Large.CashPrice or 0) or 0))),
                 extra = 'Large'
@@ -245,7 +245,7 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
     }, function(data)
         if data and data.value and data.value.extra then
             sdbSize = data.value.extra
-            Notify(_U('size_selected_notify', sdbSize), 1500)
+            Notify(Feather.Locale.translateUpper('size_selected_notify', sdbSize), 1500)
         end
     end)
     CreateSDBPage:RegisterElement('line', {
@@ -253,30 +253,30 @@ function OpenCreateSDBPage(bank, ParentPage, selectedPayWith, initialName, initi
         style = {}
     })
     CreateSDBPage:RegisterElement('button', {
-        label = _U("create_box_button"),
+        label = Feather.Locale.translateUpper("create_box_button"),
         slot  = 'footer',
         style = {}
     }, function()
         if not sdbName or sdbName == '' then
-            Notify(_U("enter_box_name_notify"), 3000)
+            Notify(Feather.Locale.translateUpper("enter_box_name_notify"), 3000)
             return
         end
         if not sdbSize then
-            Notify(_U("select_size_notify"), 3000)
+            Notify(Feather.Locale.translateUpper("select_size_notify"), 3000)
             return
         end
-        local ok, result = exports['feather-core']:CallRPCAsync('Feather:Banks:CreateSDB', {
+        local ok, result = exports['feather-core']:CallRPCAsync('bcc-banks:CreateSDB', {
             name = sdbName,
             bank = bank.id,
             size = sdbSize,
             payWith = payWith
         })
         if not ok then return end
-        Notify(_U("box_created_notify", sdbName), 3000)
+        Notify(Feather.Locale.translateUpper("box_created_notify", sdbName), 3000)
         OpenSDBListPage(bank, ParentPage)
     end)
     CreateSDBPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = 'footer',
         style = {}
     }, function()
@@ -298,11 +298,11 @@ function OpenSDBInventory(sdb, ParentPage)
     Wait(250)
     local sdbId = NormalizeId(sdb and sdb.id)
     devPrint('[SDB] Normalized sdb.id ->', tostring(sdbId))
-    local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:OpenSDB', { sdb_id = sdbId })
-    devPrint('[SDB] RPC Feather:Banks:OpenSDB returned:', tostring(ok))
+    local ok = exports['feather-core']:CallRPCAsync('bcc-banks:OpenSDB', { sdb_id = sdbId })
+    devPrint('[SDB] RPC bcc-banks:OpenSDB returned:', tostring(ok))
     if not ok then
         devPrint('[SDB] OpenSDB RPC failed for id=', tostring(sdbId))
-        Notify(_U('error_unable_open_sdb') or 'Unable to open Safety Deposit Box.', 'error', 3500)
+        Notify(Feather.Locale.translateUpper('error_unable_open_sdb') or 'Unable to open Safety Deposit Box.', 'error', 3500)
     else
         devPrint('[SDB] Opened inventory for id=', tostring(sdbId))
     end
@@ -311,11 +311,11 @@ end
 function OpenSDBAccessMenu(sdb, ParentPage, SDBListPage)
     local AccessPage = FeatherBankMenu:RegisterPage('sdb:page:access:' .. tostring(sdb.id))
     AccessPage:RegisterElement('header', {
-        value = _U("sdb_access_header"),
+        value = Feather.Locale.translateUpper("sdb_access_header"),
         slot  = 'header'
     })
     AccessPage:RegisterElement('subheader', {
-        value = _U("sdb_access_subheader"),
+        value = Feather.Locale.translateUpper("sdb_access_subheader"),
         slot  = 'header'
     })
     AccessPage:RegisterElement('line', {
@@ -323,13 +323,13 @@ function OpenSDBAccessMenu(sdb, ParentPage, SDBListPage)
         style = {}
     })
     AccessPage:RegisterElement('button', {
-        label = _U("give_access_button"),
+        label = Feather.Locale.translateUpper("give_access_button"),
         style = {}
     }, function()
         OpenSDBGiveAccessPage(sdb, AccessPage, SDBListPage)
     end)
     AccessPage:RegisterElement('button', {
-        label = _U("remove_access_button"),
+        label = Feather.Locale.translateUpper("remove_access_button"),
         style = {}
     }, function()
         OpenSDBRemoveAccessPage(sdb, AccessPage, SDBListPage)
@@ -339,7 +339,7 @@ function OpenSDBAccessMenu(sdb, ParentPage, SDBListPage)
         style = {}
     })
     AccessPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = 'footer',
         style = {}
     }, function()
@@ -359,7 +359,7 @@ function OpenSDBGiveAccessPage(sdb, ParentPage, SDBListPage)
     local lastName  = ''
     local level     = nil
     SDBGiveAccessPage:RegisterElement('header', {
-        value = _U("grant_sdb_access_header"),
+        value = Feather.Locale.translateUpper("grant_sdb_access_header"),
         slot  = 'header'
     })
     SDBGiveAccessPage:RegisterElement('line', {
@@ -367,48 +367,48 @@ function OpenSDBGiveAccessPage(sdb, ParentPage, SDBListPage)
         style = {}
     })
     SDBGiveAccessPage:RegisterElement('input', {
-        label       = _U("character_id_label"),
-        placeholder = _U("character_id_placeholder"),
+        label       = Feather.Locale.translateUpper("character_id_label"),
+        placeholder = Feather.Locale.translateUpper("character_id_placeholder"),
         style       = {}
     }, function(data)
         charId = tonumber(data.value)
     end)
     SDBGiveAccessPage:RegisterElement('input', {
-        label       = _U("check_recipient_label"),
-        placeholder = _U("check_recipient_placeholder"),
+        label       = Feather.Locale.translateUpper("check_recipient_label"),
+        placeholder = Feather.Locale.translateUpper("check_recipient_placeholder"),
         style       = {}
     }, function(data)
         firstName = data.value or ''
     end)
     SDBGiveAccessPage:RegisterElement('input', {
-        label       = _U("check_recipient_last_label"),
-        placeholder = _U("check_recipient_last_placeholder"),
+        label       = Feather.Locale.translateUpper("check_recipient_last_label"),
+        placeholder = Feather.Locale.translateUpper("check_recipient_last_placeholder"),
         style       = {}
     }, function(data)
         lastName = data.value or ''
     end)
     SDBGiveAccessPage:RegisterElement('input', {
-        label       = _U("access_level_label"),
-        placeholder = _U("access_level_placeholder"),
+        label       = Feather.Locale.translateUpper("access_level_label"),
+        placeholder = Feather.Locale.translateUpper("access_level_placeholder"),
         style       = {}
     }, function(data)
         level = tonumber(data.value)
     end)
     SDBGiveAccessPage:RegisterElement('button', {
-        label = _U("grant_access_button"),
+        label = Feather.Locale.translateUpper("grant_access_button"),
         style = {}
     }, function()
         local fn = firstName:match('^%s*(.-)%s*$')
         local ln = lastName:match('^%s*(.-)%s*$')
         if (not charId or charId < 1) and (fn == '' or ln == '') then
-            Notify(_U("invalid_character_id"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_character_id"), 4000)
             return
         end
         if not level then
-            Notify(_U("invalid_char_id_level"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_char_id_level"), 4000)
             return
         end
-        local ok, res = exports['feather-core']:CallRPCAsync('Feather:Banks:AddSDBAccess', {
+        local ok, res = exports['feather-core']:CallRPCAsync('bcc-banks:AddSDBAccess', {
             sdb_id     = NormalizeId(sdb.id),
             character  = charId,
             user_src   = charId,
@@ -423,7 +423,7 @@ function OpenSDBGiveAccessPage(sdb, ParentPage, SDBListPage)
         style = {}
     })
     SDBGiveAccessPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = 'footer',
         style = {}
     }, function()
@@ -434,11 +434,11 @@ function OpenSDBGiveAccessPage(sdb, ParentPage, SDBListPage)
         style = {}
     })
     SDBGiveAccessPage:RegisterElement('textdisplay', {
-        value = _U("grant_sdb_access_help_identity"),
+        value = Feather.Locale.translateUpper("grant_sdb_access_help_identity"),
         slot  = 'footer'
     })
     SDBGiveAccessPage:RegisterElement('textdisplay', {
-        value = _U("grant_sdb_access_help_levels"),
+        value = Feather.Locale.translateUpper("grant_sdb_access_help_levels"),
         slot  = 'footer'
     })
     SDBGiveAccessPage:RegisterElement('line', {
@@ -451,51 +451,51 @@ end
 function OpenSDBRemoveAccessPage(sdb, ParentPage, SDBListPage)
     local SDBRemoveAccessPage = FeatherBankMenu:RegisterPage('sdb:page:access:remove:' .. tostring(sdb.id))
     SDBRemoveAccessPage:RegisterElement('header', {
-        value = _U("remove_sdb_access_header"),
+        value = Feather.Locale.translateUpper("remove_sdb_access_header"),
         slot  = 'header'
     })
     SDBRemoveAccessPage:RegisterElement('line', {
         slot  = 'header',
         style = {}
     })
-    local ok, result = exports['feather-core']:CallRPCAsync('Feather:Banks:GetSDBAccessList', { sdb_id = NormalizeId(sdb.id) })
+    local ok, result = exports['feather-core']:CallRPCAsync('bcc-banks:GetSDBAccessList', { sdb_id = NormalizeId(sdb.id) })
     local accessList = (ok and result and result.access) or {}
     if #accessList == 0 then
         SDBRemoveAccessPage:RegisterElement('textdisplay', {
-            value = _U("no_users_access_box"),
+            value = Feather.Locale.translateUpper("no_users_access_box"),
             style = { ['text-align'] = 'center' }
         })
     else
         for _, access in ipairs(accessList) do
             local label = '[' .. tostring(access.character_id) .. '] ' ..
-                (access.first_name or _U("unknown")) .. ' ' ..
+                (access.first_name or Feather.Locale.translateUpper("unknown")) .. ' ' ..
                 (access.last_name  or '') .. ' (' ..
-                _U("level") .. ' ' .. tostring(access.level) .. ')'
+                Feather.Locale.translateUpper("level") .. ' ' .. tostring(access.level) .. ')'
             SDBRemoveAccessPage:RegisterElement('button', {
                 label = label,
                 style = {}
             }, function()
                 local confirmPage = FeatherBankMenu:RegisterPage('sdb:page:access:remove:confirm:' .. access.character_id)
                 confirmPage:RegisterElement('header', {
-                    value = _U("confirm_remove_access_header"),
+                    value = Feather.Locale.translateUpper("confirm_remove_access_header"),
                     slot  = 'header'
                 })
                 confirmPage:RegisterElement('textdisplay', {
-                    value = _U("confirm_remove_access_text", label),
+                    value = Feather.Locale.translateUpper("confirm_remove_access_text", label),
                     style = { ['text-align'] = 'center' }
                 })
                 confirmPage:RegisterElement('button', {
-                    label = _U("confirm_remove_button"),
+                    label = Feather.Locale.translateUpper("confirm_remove_button"),
                     style = {}
                 }, function()
-                    local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:RemoveSDBAccess', {
+                    local ok = exports['feather-core']:CallRPCAsync('bcc-banks:RemoveSDBAccess', {
                         sdb_id    = NormalizeId(sdb.id),
                         character = access.character_id
                     })
                     OpenSDBRemoveAccessPage(sdb, ParentPage, SDBListPage)
                 end)
                 confirmPage:RegisterElement('button', {
-                    label = _U("cancel_button"),
+                    label = Feather.Locale.translateUpper("cancel_button"),
                     style = {}
                 }, function()
                     OpenSDBRemoveAccessPage(sdb, ParentPage, SDBListPage)
@@ -509,7 +509,7 @@ function OpenSDBRemoveAccessPage(sdb, ParentPage, SDBListPage)
         style = {}
     })
     SDBRemoveAccessPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = 'footer',
         style = {}
     }, function()

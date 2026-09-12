@@ -91,6 +91,9 @@ function GetBankingContext(source)
     return character
 end
 
+-- Shared temporary wallets for the Feather shops port.
+exports('GetBankingContext', GetBankingContext)
+
 MySQL.ready(function()
     local initialized = BanksEconomy.Initialize()
     if type(initialized) ~= 'table' or initialized.ok ~= true then

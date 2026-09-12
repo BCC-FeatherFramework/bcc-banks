@@ -1,7 +1,7 @@
 function OpenGoldExchangePage(bank, ParentPage)
     local GoldExchangePage = FeatherBankMenu:RegisterPage('bank:page:gold:' .. tostring(bank.id))
 
-    local ok, rates = exports['feather-core']:CallRPCAsync('Feather:Banks:GetGoldRates', {})
+    local ok, rates = exports['feather-core']:CallRPCAsync('bcc-banks:GetGoldRates', {})
     rates = rates or { buy = 10.0, sell = 9.0 }
 
     local function round2(n)
@@ -29,17 +29,17 @@ function OpenGoldExchangePage(bank, ParentPage)
     end
 
     GoldExchangePage:RegisterElement('header', {
-        value = _U("gold_services_header"),
+        value = Feather.Locale.translateUpper("gold_services_header"),
         slot  = "header"
     })
 
     GoldExchangePage:RegisterElement('subheader', {
-        value = _U("gold_services_subheader"),
+        value = Feather.Locale.translateUpper("gold_services_subheader"),
         slot  = "header"
     })
 
     GoldExchangePage:RegisterElement('textdisplay', {
-        value = _U('gold_rates_label', toFixed(rates.buy, 2), toFixed(rates.sell, 2)),
+        value = Feather.Locale.translateUpper('gold_rates_label', toFixed(rates.buy, 2), toFixed(rates.sell, 2)),
         slot  = 'header'
     })
 
@@ -51,36 +51,36 @@ function OpenGoldExchangePage(bank, ParentPage)
     -- Buy flow: enter GOLD amount to purchase (cash auto-calculated)
     local buyGoldValue = ''
     GoldExchangePage:RegisterElement('input', {
-        label       = _U("gold_amount_label"),
-        placeholder = _U("gold_amount_placeholder"),
+        label       = Feather.Locale.translateUpper("gold_amount_label"),
+        placeholder = Feather.Locale.translateUpper("gold_amount_placeholder"),
         style       = {}
     }, function(data)
         buyGoldValue = data.value
     end)
 
     GoldExchangePage:RegisterElement('button', {
-        label = _U("buy_with_cash_button"),
+        label = Feather.Locale.translateUpper("buy_with_cash_button"),
         style = {}
     }, function()
         local goldAmt = tonumber(buyGoldValue)
         if not goldAmt or goldAmt <= 0 then
-            Notify(_U("invalid_gold_amount"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_gold_amount"), 4000)
             return
         end
         local cashAmt = round2((rates.buy or 0) * goldAmt)
         local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:gold:confirm:buyg:' .. tostring(goldAmt))
         ConfirmPage:RegisterElement('header', {
-            value = _U('gold_confirm_header'),
+            value = Feather.Locale.translateUpper('gold_confirm_header'),
             slot  = 'header'
         })
         ConfirmPage:RegisterElement('textdisplay', {
-            value = _U('gold_confirm_buy_gold', toFixed(goldAmt, 2), toFixed(cashAmt, 2)),
+            value = Feather.Locale.translateUpper('gold_confirm_buy_gold', toFixed(goldAmt, 2), toFixed(cashAmt, 2)),
             style = { ['text-align'] = 'center' }
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('confirm_button')
+            label = Feather.Locale.translateUpper('confirm_button')
         }, function()
-            exports['feather-core']:CallRPCAsync('Feather:Banks:BuyGold', { gold = goldAmt })
+            exports['feather-core']:CallRPCAsync('bcc-banks:BuyGold', { gold = goldAmt })
             OpenGoldExchangePage(bank, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', {
@@ -88,7 +88,7 @@ function OpenGoldExchangePage(bank, ParentPage)
             style = {}
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('back_button'),
+            label = Feather.Locale.translateUpper('back_button'),
             slot  = 'footer',
             style = {}
         }, function()
@@ -105,36 +105,36 @@ function OpenGoldExchangePage(bank, ParentPage)
 
     local sellGoldValue = ''
     GoldExchangePage:RegisterElement('input', {
-        label       = _U("gold_amount_label"),
-        placeholder = _U("gold_amount_placeholder"),
+        label       = Feather.Locale.translateUpper("gold_amount_label"),
+        placeholder = Feather.Locale.translateUpper("gold_amount_placeholder"),
         style       = {}
     }, function(data)
         sellGoldValue = data.value
     end)
 
     GoldExchangePage:RegisterElement('button', {
-        label = _U("sell_for_cash_button"),
+        label = Feather.Locale.translateUpper("sell_for_cash_button"),
         style = {}
     }, function()
         local goldAmt = tonumber(sellGoldValue)
         if not goldAmt or goldAmt <= 0 then
-            Notify(_U("invalid_gold_amount"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_gold_amount"), 4000)
             return
         end
         local cashAmt = round2(goldAmt * (rates.sell or 0))
         local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:gold:confirm:sellg:' .. tostring(goldAmt))
         ConfirmPage:RegisterElement('header', {
-            value = _U('gold_confirm_header'),
+            value = Feather.Locale.translateUpper('gold_confirm_header'),
             slot  = 'header'
         })
         ConfirmPage:RegisterElement('textdisplay', {
-            value = _U('gold_confirm_sell_gold', toFixed(goldAmt, 2), toFixed(cashAmt, 2)),
+            value = Feather.Locale.translateUpper('gold_confirm_sell_gold', toFixed(goldAmt, 2), toFixed(cashAmt, 2)),
             style = { ['text-align'] = 'center' }
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('confirm_button')
+            label = Feather.Locale.translateUpper('confirm_button')
         }, function()
-            exports['feather-core']:CallRPCAsync('Feather:Banks:SellGold', { gold = goldAmt })
+            exports['feather-core']:CallRPCAsync('bcc-banks:SellGold', { gold = goldAmt })
             OpenGoldExchangePage(bank, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', {
@@ -142,7 +142,7 @@ function OpenGoldExchangePage(bank, ParentPage)
             style = {}
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('back_button'),
+            label = Feather.Locale.translateUpper('back_button'),
             slot  = 'footer',
             style = {}
         }, function()
@@ -158,25 +158,25 @@ function OpenGoldExchangePage(bank, ParentPage)
     GoldExchangePage:RegisterElement('line', { style = {} })
 
     GoldExchangePage:RegisterElement('subheader', {
-        value = _U('goldbars_section_header'),
+        value = Feather.Locale.translateUpper('goldbars_section_header'),
     })
 
     local goldBarCount = ''
     GoldExchangePage:RegisterElement('input', {
-        label       = _U('goldbars_count_label'),
-        placeholder = _U('goldbars_count_placeholder'),
+        label       = Feather.Locale.translateUpper('goldbars_count_label'),
+        placeholder = Feather.Locale.translateUpper('goldbars_count_placeholder'),
         style       = {}
     }, function(data)
         goldBarCount = data.value
     end)
 
     GoldExchangePage:RegisterElement('button', {
-        label = _U('goldbars_redeem_button'),
+        label = Feather.Locale.translateUpper('goldbars_redeem_button'),
         style = {}
     }, function()
         local count = tonumber(goldBarCount)
         if not count or count <= 0 then
-            Notify(_U('error_invalid_goldbar_count'), 4000)
+            Notify(Feather.Locale.translateUpper('error_invalid_goldbar_count'), 4000)
             return
         end
         local perBar = (Config and Config.GoldExchange and Config.GoldExchange.GoldBarToGold) or 1.0
@@ -186,17 +186,17 @@ function OpenGoldExchangePage(bank, ParentPage)
 
         local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:gold:confirm:bars:' .. tostring(count))
         ConfirmPage:RegisterElement('header', {
-            value = _U('gold_confirm_header'),
+            value = Feather.Locale.translateUpper('gold_confirm_header'),
             slot  = 'header'
         })
         ConfirmPage:RegisterElement('textdisplay', {
-            value = _U('goldbars_confirm_text', toFixed(count, 0), toFixed(net, 2), toFixed(feePct, 2)),
+            value = Feather.Locale.translateUpper('goldbars_confirm_text', toFixed(count, 0), toFixed(net, 2), toFixed(feePct, 2)),
             style = { ['text-align'] = 'center' }
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('confirm_button')
+            label = Feather.Locale.translateUpper('confirm_button')
         }, function()
-            exports['feather-core']:CallRPCAsync('Feather:Banks:ExchangeGoldBars', { count = count })
+            exports['feather-core']:CallRPCAsync('bcc-banks:ExchangeGoldBars', { count = count })
             OpenGoldExchangePage(bank, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', {
@@ -204,7 +204,7 @@ function OpenGoldExchangePage(bank, ParentPage)
             style = {}
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('back_button'),
+            label = Feather.Locale.translateUpper('back_button'),
             slot  = 'footer',
             style = {}
         }, function()
@@ -223,7 +223,7 @@ function OpenGoldExchangePage(bank, ParentPage)
     })
 
     GoldExchangePage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()

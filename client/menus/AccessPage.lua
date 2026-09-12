@@ -2,12 +2,12 @@ function OpenAccessMenu(account, ParentPage)
     local AccessMenuPage = FeatherBankMenu:RegisterPage("account:page:access:" .. tostring(account.id))
 
     AccessMenuPage:RegisterElement("header", {
-        value = _U("account_access_header"),
+        value = Feather.Locale.translateUpper("account_access_header"),
         slot  = "header"
     })
 
     AccessMenuPage:RegisterElement("subheader", {
-        value = _U("account_access_subheader"),
+        value = Feather.Locale.translateUpper("account_access_subheader"),
         slot  = "header"
     })
 
@@ -17,14 +17,14 @@ function OpenAccessMenu(account, ParentPage)
     })
 
     AccessMenuPage:RegisterElement("button", {
-        label = _U("give_access_button"),
+        label = Feather.Locale.translateUpper("give_access_button"),
         style = {}
     }, function()
         OpenGiveAccessPage(account, ParentPage)
     end)
 
     AccessMenuPage:RegisterElement("button", {
-        label = _U("remove_access_button"),
+        label = Feather.Locale.translateUpper("remove_access_button"),
         style = {}
     }, function()
         OpenRemoveAccessPage(account, ParentPage)
@@ -36,7 +36,7 @@ function OpenAccessMenu(account, ParentPage)
     })
 
     AccessMenuPage:RegisterElement("button", {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -55,7 +55,7 @@ function OpenGiveAccessPage(account, ParentPage)
     local GiveAccessPage = FeatherBankMenu:RegisterPage("account:page:access:give:" .. tostring(account.id))
 
     GiveAccessPage:RegisterElement("header", {
-        value = _U("give_access_header"),
+        value = Feather.Locale.translateUpper("give_access_header"),
         slot  = "header"
     })
 
@@ -69,31 +69,31 @@ function OpenGiveAccessPage(account, ParentPage)
     local level     = nil
 
     GiveAccessPage:RegisterElement("input", {
-        label       = _U("check_recipient_label"),
-        placeholder = _U("check_recipient_placeholder"),
+        label       = Feather.Locale.translateUpper("check_recipient_label"),
+        placeholder = Feather.Locale.translateUpper("check_recipient_placeholder"),
         style       = {}
     }, function(data)
         firstName = data.value or ''
     end)
 
     GiveAccessPage:RegisterElement("input", {
-        label       = _U("check_recipient_last_label"),
-        placeholder = _U("check_recipient_last_placeholder"),
+        label       = Feather.Locale.translateUpper("check_recipient_last_label"),
+        placeholder = Feather.Locale.translateUpper("check_recipient_last_placeholder"),
         style       = {}
     }, function(data)
         lastName = data.value or ''
     end)
 
     GiveAccessPage:RegisterElement("input", {
-        label       = _U("access_level_label"),
-        placeholder = _U("access_level_placeholder"),
+        label       = Feather.Locale.translateUpper("access_level_label"),
+        placeholder = Feather.Locale.translateUpper("access_level_placeholder"),
         style       = {}
     }, function(data)
         level = tonumber(data.value)
     end)
 
     GiveAccessPage:RegisterElement("textdisplay", {
-        value = _U("access_levels_description"),
+        value = Feather.Locale.translateUpper("access_levels_description"),
         slot  = "content"
     })
 
@@ -103,7 +103,7 @@ function OpenGiveAccessPage(account, ParentPage)
     })
 
     GiveAccessPage:RegisterElement("button", {
-        label = _U("grant_access_button"),
+        label = Feather.Locale.translateUpper("grant_access_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -111,16 +111,16 @@ function OpenGiveAccessPage(account, ParentPage)
         local ln = lastName:match('^%s*(.-)%s*$')
 
         if fn == '' or ln == '' then
-            Notify(_U("invalid_character_id"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_character_id"), 4000)
             return
         end
 
         if not level or level < 1 or level > 4 then
-            Notify(_U("invalid_access_level"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_access_level"), 4000)
             return
         end
 
-        local ok, result = exports['feather-core']:CallRPCAsync("Feather:Banks:GiveAccountAccess", {
+        local ok, result = exports['feather-core']:CallRPCAsync("bcc-banks:GiveAccountAccess", {
             account    = account.id,
             first_name = fn,
             last_name  = ln,
@@ -135,7 +135,7 @@ function OpenGiveAccessPage(account, ParentPage)
     end)
     
     GiveAccessPage:RegisterElement("button", {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -154,7 +154,7 @@ function OpenRemoveAccessPage(account, ParentPage)
     local RemoveAccessPage = FeatherBankMenu:RegisterPage("account:page:access:remove:" .. tostring(account.id))
 
     RemoveAccessPage:RegisterElement("header", {
-        value = _U("remove_access_header"),
+        value = Feather.Locale.translateUpper("remove_access_header"),
         slot  = "header"
     })
 
@@ -165,7 +165,7 @@ function OpenRemoveAccessPage(account, ParentPage)
 
     local accountId = NormalizeId(account.id)
 
-    local ok, response = exports['feather-core']:CallRPCAsync("Feather:Banks:GetAccountAccessList", {
+    local ok, response = exports['feather-core']:CallRPCAsync("bcc-banks:GetAccountAccessList", {
         account = accountId
     })
 
@@ -175,7 +175,7 @@ function OpenRemoveAccessPage(account, ParentPage)
 
     if #accessList == 0 then
         RemoveAccessPage:RegisterElement("textdisplay", {
-            value = _U("no_access_characters"),
+            value = Feather.Locale.translateUpper("no_access_characters"),
             style = {
                 ["text-align"] = "center",
                 color           = "gray"
@@ -183,8 +183,8 @@ function OpenRemoveAccessPage(account, ParentPage)
         })
     else
         for _, access in ipairs(accessList) do
-            local fullName = (access.first_name or _U("unknown")) .. " " .. (access.last_name or "")
-            local label    = "[" .. tostring(access.character_id) .. "] " .. fullName .. " (" .. _U("level") .. " " .. tostring(access.level) .. ")"
+            local fullName = (access.first_name or Feather.Locale.translateUpper("unknown")) .. " " .. (access.last_name or "")
+            local label    = "[" .. tostring(access.character_id) .. "] " .. fullName .. " (" .. Feather.Locale.translateUpper("level") .. " " .. tostring(access.level) .. ")"
 
             RemoveAccessPage:RegisterElement("button", {
                 label = label,
@@ -193,31 +193,31 @@ function OpenRemoveAccessPage(account, ParentPage)
                 local ConfirmPage = FeatherBankMenu:RegisterPage("account:page:access:remove:confirm:" .. tostring(access.character_id))
 
                 ConfirmPage:RegisterElement("header", {
-                    value = _U("confirm_removal_header"),
+                    value = Feather.Locale.translateUpper("confirm_removal_header"),
                     slot  = "header"
                 })
 
                 ConfirmPage:RegisterElement("textdisplay", {
-                    value = _U("confirm_removal_text") .. "\n" .. fullName .. " [" .. tostring(access.character_id) .. "]",
+                    value = Feather.Locale.translateUpper("confirm_removal_text") .. "\n" .. fullName .. " [" .. tostring(access.character_id) .. "]",
                     style = { ["text-align"] = "center" }
                 })
 
                 ConfirmPage:RegisterElement("button", {
-                    label = _U("confirm_removal_button"),
+                    label = Feather.Locale.translateUpper("confirm_removal_button"),
                     style = {}
                 }, function()
-                    local ok = exports['feather-core']:CallRPCAsync("Feather:Banks:RemoveAccountAccess", {
+                    local ok = exports['feather-core']:CallRPCAsync("bcc-banks:RemoveAccountAccess", {
                         account   = accountId,
                         character = access.character_id
                     })
 
-                    if ok then devPrint(_U("access_removed_log"), access.character_id)
-                    else devPrint(_U("failed_remove_access_log"), access.character_id) end
+                    if ok then devPrint(Feather.Locale.translateUpper("access_removed_log"), access.character_id)
+                    else devPrint(Feather.Locale.translateUpper("failed_remove_access_log"), access.character_id) end
                     OpenRemoveAccessPage(account, ParentPage)
                 end)
 
                 ConfirmPage:RegisterElement("button", {
-                    label = _U("cancel_removal_button"),
+                    label = Feather.Locale.translateUpper("cancel_removal_button"),
                     style = {}
                 }, function()
                     OpenRemoveAccessPage(account, ParentPage)
@@ -229,7 +229,7 @@ function OpenRemoveAccessPage(account, ParentPage)
     end
 
     RemoveAccessPage:RegisterElement("button", {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()

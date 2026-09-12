@@ -1,4 +1,4 @@
-exports['feather-core']:RegisterRPC('Feather:Banks:GetTransactions', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetTransactions', function(params, cb, src)
     devPrint("RPC called by src:", src)
 
     local account = NormalizeId(params and params.account)
@@ -6,7 +6,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetTransactions', function(pa
 
     if not account then
         devPrint("Invalid account ID.")
-        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id.', 'error', 4000)
         cb(false)
         return
     end
@@ -15,13 +15,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetTransactions', function(pa
     local char = user
     local characterId = char and char.characterId
     if not characterId or not (HasAccountAccess(account, characterId) or IsAccountOwner(account, characterId)) then
-        NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
         cb(false)
         return
     end
     local accountRow = GetAccount(account)
     if not accountRow or not IsPlayerNearBank(src, accountRow.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -34,7 +34,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetTransactions', function(pa
 
     if not ok then
         devPrint("Database error during transaction fetch.")
-        NotifyClient(src, _U('error_db') or 'DB error.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_db') or 'DB error.', 'error', 4000)
         cb(false)
         return
     end

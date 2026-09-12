@@ -9,9 +9,8 @@ end
 
 local authorizedAttempts = {}
 
-RegisterNetEvent('feather-banks:lockpick:canStart', function(doorHash)
-  local src = source
-  doorHash = tonumber(doorHash)
+exports['feather-core']:RegisterRPC('bcc-banks:lockpick:canStart', function(params, cb, src)
+  local doorHash = tonumber(params and params.doorHash)
   local can = doorHash ~= nil
       and Config.LockPicking and Config.LockPicking.Enabled == true
       and Config.Doors[doorHash] ~= nil
@@ -26,38 +25,59 @@ RegisterNetEvent('feather-banks:lockpick:canStart', function(doorHash)
   else
     authorizedAttempts[src] = nil
   end
-  TriggerClientEvent('feather-banks:lockpick:canStart:cb', src, can)
+  cb(true, can)
 end)
 
-RegisterNetEvent('feather-banks:lockpick:onSuccess', function(doorHash)
-  local src = source
-  doorHash = tonumber(doorHash)
+exports['feather-core']:RegisterRPC('bcc-banks:lockpick:onSuccess', function(params, cb, src)
+  local doorHash = tonumber(params and params.doorHash)
   local attempt = authorizedAttempts[src]
   authorizedAttempts[src] = nil
   local now = GetGameTimer()
-  if not attempt or attempt.door ~= doorHash or now < attempt.earliest or now > attempt.expires then return end
-  if Config.Doors[doorHash] == nil or not IsPlayerNearBank(src, nil, 25.0, false) then return end
-  if not hasLockpickItem(src) then return end
+  if not attempt or attempt.door ~= doorHash or now < attempt.earliest or now > attempt.expires then
+    cb(true)
+    return
+  end
+  if Config.Doors[doorHash] == nil or not IsPlayerNearBank(src, nil, 25.0, false) then
+    cb(true)
+    return
+  end
+  if not hasLockpickItem(src) then
+    cb(true)
+    return
+  end
 
-  TriggerClientEvent('feather-banks:lockpick:setDoorState', -1, doorHash, 0, src, 'lockpick')
+  TriggerClientEvent('bcc-banks:lockpick:setDoorState', -1, doorHash, 0, src, 'lockpick')
   local relock = tonumber(Config.LockPicking.RelockSeconds or 0) or 0
   if relock > 0 then
     SetTimeout(relock * 1000, function()
-      TriggerClientEvent('feather-banks:lockpick:setDoorState', -1, doorHash, 1, 0, 'relock')
+      TriggerClientEvent('bcc-banks:lockpick:setDoorState', -1, doorHash, 1, 0, 'relock')
     end)
   end
+  cb(true)
 end)
 
-RegisterNetEvent('feather-banks:lockpick:bypassSetDoorState', function(doorHash, state)
-  local src = source
-  doorHash = tonumber(doorHash)
-  state = tonumber(state)
-  if not doorHash or (state ~= 0 and state ~= 1) then return end
-  if not Config.LockPicking or Config.LockPicking.Enabled ~= true or Config.LockPicking.AdminBypass == false then return end
-  if Config.Doors[doorHash] == nil or not IsPlayerNearBank(src, nil, 25.0, false) then return end
-  if not IsBankAdmin(src) then return end
+exports['feather-core']:RegisterRPC('bcc-banks:lockpick:bypassSetDoorState', function(params, cb, src)
+  local doorHash = tonumber(params and params.doorHash)
+  local state = tonumber(params and params.state)
+  if not doorHash or (state ~= 0 and state ~= 1) then
+    cb(true)
+    return
+  end
+  if not Config.LockPicking or Config.LockPicking.Enabled ~= true or Config.LockPicking.AdminBypass == false then
+    cb(true)
+    return
+  end
+  if Config.Doors[doorHash] == nil or not IsPlayerNearBank(src, nil, 25.0, false) then
+    cb(true)
+    return
+  end
+  if not IsBankAdmin(src) then
+    cb(true)
+    return
+  end
 
-  TriggerClientEvent('feather-banks:lockpick:setDoorState', -1, doorHash, state, src, 'bypass')
+  TriggerClientEvent('bcc-banks:lockpick:setDoorState', -1, doorHash, state, src, 'bypass')
+  cb(true)
 end)
 
 AddEventHandler('playerDropped', function()
@@ -65,8 +85,7 @@ AddEventHandler('playerDropped', function()
 end)
 
 -- Reduce lockpick durability or destroy on failure (mirrors MMS style)
-RegisterNetEvent('feather-banks:lockpick:onFail', function()
-  local src = source
+exports['feather-core']:RegisterRPC('bcc-banks:lockpick:onFail', function(_, cb, src)
   local cfg = Config.LockPicking or {}
   local itemName = (cfg and cfg.ItemName) or 'lockpick'
   local dur = (cfg and cfg.Durability) or {}
@@ -75,16 +94,28 @@ RegisterNetEvent('feather-banks:lockpick:onFail', function()
     local damage = tonumber(dur.DamageOnFail or 10) or 10
     local inventory = exports['feather-inventory'].initiate()
     local session = exports['feather-core']:GetSessionContext(src)
-    if type(session) ~= 'table' or session.ok ~= true or not session.value.characterId then return end
+    if type(session) ~= 'table' or session.ok ~= true or not session.value.characterId then
+      cb(true)
+      return
+    end
     local characterInventory = inventory.Inventory.GetCharacterInventory(session.value.characterId)
-    if type(characterInventory) ~= 'table' or characterInventory.ok ~= true then return end
+    if type(characterInventory) ~= 'table' or characterInventory.ok ~= true then
+      cb(true)
+      return
+    end
     local items = inventory.Inventory.GetInventoryItems(characterInventory.value.id)
-    if type(items) ~= 'table' or items.ok ~= true then return end
+    if type(items) ~= 'table' or items.ok ~= true then
+      cb(true)
+      return
+    end
     local instance
     for _, candidate in ipairs(items.value or {}) do
       if candidate.name == itemName then instance = candidate break end
     end
-    if not instance or not instance.id then return end
+    if not instance or not instance.id then
+      cb(true)
+      return
+    end
     local adjusted = inventory.Items.AdjustCondition(instance.id, -damage)
     local remainingCondition = type(adjusted) == 'table' and adjusted.ok == true
       and tonumber(adjusted.value and adjusted.value.condition) or nil
@@ -94,4 +125,5 @@ RegisterNetEvent('feather-banks:lockpick:onFail', function()
   elseif (dur.DestroyOnFailIfDisabled == true) then
     exports['feather-inventory'].initiate().Items.RemoveItemByName(itemName, 1, src)
   end
+  cb(true)
 end)

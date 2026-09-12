@@ -3,18 +3,18 @@ local function getSDBBankId(sdbId)
     return row and row.bank_id or nil
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBs', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetSDBs', function(params, cb, src)
     local user = GetBankingContext(src)
     if not user then
         devPrint('GetSDBs: no user for src', src)
-        NotifyClient(src, _U('error_invalid_character_or_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_or_bank'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint('GetSDBs: no character for src', src)
-        NotifyClient(src, _U('error_invalid_character_or_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_or_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -23,13 +23,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBs', function(params, cb
 
     if not characterId or not bankId then
         devPrint("GetSDBs: invalid inputs", "characterId=", characterId, "bankId=", bankId)
-        NotifyClient(src, _U('error_invalid_character_or_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_or_bank'), 'error', 4000)
         cb(false)
         return
     end
 
     if not IsPlayerNearBank(src, bankId) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -40,7 +40,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBs', function(params, cb
 
     if not ok then
         devPrint("GetSDBs: DB error while fetching SDBs for", characterId, "bank", bankId)
-        NotifyClient(src, _U('error_db'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_db'), 'error', 4000)
         cb(false)
         return
     end
@@ -48,11 +48,11 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBs', function(params, cb
     cb(true, rows or {})
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, src)
     local user = GetBankingContext(src)
-    if not user then NotifyClient(src, _U('error_invalid_data'), 'error', 4000) return cb(false) end
+    if not user then NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000) return cb(false) end
     local char = user
-    if not char then NotifyClient(src, _U('error_invalid_data'), 'error', 4000) return cb(false) end
+    if not char then NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000) return cb(false) end
 
     -- inputs
     local characterId = char.characterId          -- adjust if your framework uses a different name
@@ -63,11 +63,11 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
 
     if not characterId or not bank or not name or name == "" or not sizeKey then
         devPrint("CreateSDB invalid inputs", characterId, bank, name, sizeKey)
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         return cb(false)
     end
     if not IsPlayerNearBank(src, bank) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         return cb(false)
     end
     name = tostring(name):sub(1, 64)
@@ -82,7 +82,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
         end
     end
     if not sz then
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         return cb(false)
     end
 
@@ -90,7 +90,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
     local currencyId = CURRENCY[(payWith == 'gold') and 'gold' or 'cash']
     local price = (payWith == 'gold') and (sz.GoldPrice or 0) or (sz.CashPrice or 0)
     if not IsFinitePositiveNumber(price) then
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         return cb(false)
     end
 
@@ -98,14 +98,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
     local balance = (currencyId == 0) and tonumber(char.money) or tonumber(char.gold)
     if not balance or balance < price then
         if currencyId == 0 then
-            NotifyClient(src, _U('error_not_enough_cash', tostring(balance or 0)), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash', tostring(balance or 0)), 'error', 4000)
         else
-            NotifyClient(src, _U('error_not_enough_gold_to_sell'), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_gold_to_sell'), 'error', 4000)
         end
         return cb(false)
     end
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         return cb(false)
     end
 
@@ -118,7 +118,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
     if not chargeOk then
         ReleasePlayerFinancialLock(src)
         devPrint("CreateSDB charge failed:", tostring(chargeErr))
-        NotifyClient(src, _U('error_unable_create_sdb'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
         return cb(false)
     end
 
@@ -128,7 +128,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
         -- refund if DB failed
         if charged then pcall(function() if char.CreditWallet then char.CreditWallet(currencyId, price) end end) end
         devPrint("CreateSDB DB failed:", tostring(ok and (szFromCtrl or "unknown") or boxOrErr))
-        NotifyClient(src, _U('error_unable_create_sdb'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
         ReleasePlayerFinancialLock(src)
         return cb(false)
     end
@@ -174,7 +174,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
             if charged and char.CreditWallet then char.CreditWallet(currencyId, price) end
         end)
         devPrint("CreateSDB: inventory registration failed:", tostring(invErr))
-        NotifyClient(src, _U('error_unable_create_sdb'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
         ReleasePlayerFinancialLock(src)
         return cb(false)
     end
@@ -196,7 +196,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateSDB', function(params, 
     cb(true, box)
 end)
 
-AddEventHandler('Feather:Banks:DatabaseReady', function()
+AddEventHandler('bcc-banks:DatabaseReady', function()
     local registered = exports['feather-inventory'].initiate().Inventory.RegisterForeignKey(
         'bcc_safety_deposit_boxes',
         'VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci', 'id')
@@ -274,18 +274,18 @@ local function getSDBInventoryContentCounts(sdbId, inventoryId, displayName, siz
     return invUuid, itemCount, weaponCount
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:OpenSDB', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:OpenSDB', function(params, cb, src)
     local user = GetBankingContext(src)
     if not user then
         devPrint('OpenSDB: no user for src', src)
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint('OpenSDB: no character for src', src)
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
@@ -294,14 +294,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:OpenSDB', function(params, cb
 
     if not characterId or not sdbId then
         devPrint("OpenSDB: invalid inputs", "characterId=", characterId, "sdbId=", sdbId)
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
 
     if not HasSDBAccess(sdbId, characterId) then
         devPrint("OpenSDB: no access", "charId=", characterId, "sdbId=", sdbId)
-        NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
         cb(false)
         return
     end
@@ -313,12 +313,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:OpenSDB', function(params, cb
     )[1]
     if not row then
         devPrint("OpenSDB: SDB row not found for id", sdbId)
-        NotifyClient(src, _U('error_sdb_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_sdb_not_found'), 'error', 4000)
         cb(false)
         return
     end
     if not IsPlayerNearBank(src, row.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -334,30 +334,30 @@ exports['feather-core']:RegisterRPC('Feather:Banks:OpenSDB', function(params, cb
     if type(temporary) ~= 'table' or temporary.ok ~= true then
         devPrint('OpenSDB: Feather Inventory access failed:',
             tostring(type(temporary) == 'table' and (temporary.message or temporary.code) or 'invalid result'))
-        NotifyClient(src, _U('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
         return cb(false)
     end
     local opened = exports['feather-inventory'].initiate().Inventory.OpenInventory(src, invUuid, 'safety_deposit_box')
     if type(opened) ~= 'table' or opened.ok ~= true then
         devPrint('OpenSDB: Feather Inventory error:',
             tostring(type(opened) == 'table' and (opened.message or opened.code) or 'invalid result'))
-        NotifyClient(src, _U('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
         cb(false)
         return
     end
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:OpenSDB', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:OpenSDB', function(params, cb, src)
     if not IsBankAdmin or not IsBankAdmin(src) then
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
 
     local sdbId = NormalizeId(params and params.sdb_id)
     if not sdbId then
-        NotifyClient(src, _U('error_invalid_sdb_id') or 'Invalid SDB id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_sdb_id') or 'Invalid SDB id', 'error', 3500)
         cb(false)
         return
     end
@@ -368,7 +368,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:OpenSDB', function(para
     )
     row = row and row[1] or nil
     if not row then
-        NotifyClient(src, _U('error_sdb_not_found') or 'SDB not found', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_sdb_not_found') or 'SDB not found', 'error', 3500)
         cb(false)
         return
     end
@@ -384,7 +384,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:OpenSDB', function(para
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBDeleteInfo', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetSDBDeleteInfo', function(params, cb, src)
     local user = GetBankingContext(src)
     if not user then
         cb(false)
@@ -430,16 +430,16 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBDeleteInfo', function(p
     })
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:DeleteSDB', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:DeleteSDB', function(params, cb, src)
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
@@ -447,7 +447,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DeleteSDB', function(params, 
     local characterId = char.characterId
     local sdbId = NormalizeId(params and params.sdb_id)
     if not characterId or not sdbId then
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
@@ -457,18 +457,18 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DeleteSDB', function(params, 
         { sdbId }
     )
     if not row then
-        NotifyClient(src, _U('error_sdb_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_sdb_not_found'), 'error', 4000)
         cb(false)
         return
     end
 
     if not (IsSDBOwner(sdbId, characterId) or IsSDBAdmin(sdbId, characterId)) then
-        NotifyClient(src, _U('error_no_permission'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), 'error', 4000)
         cb(false)
         return
     end
     if not IsPlayerNearBank(src, row.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -480,14 +480,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DeleteSDB', function(params, 
     if type(deleted) ~= 'table' or deleted.ok ~= true then
         devPrint('DeleteSDB: Feather Inventory refused deletion:',
             tostring(type(deleted) == 'table' and (deleted.message or deleted.code) or 'invalid result'))
-        NotifyClient(src, _U('failed_delete_sdb'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('failed_delete_sdb'), 'error', 4000)
         return cb(false)
     end
 
     MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', { sdbId })
     local affected = MySQL.update.await('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', { sdbId })
     if not affected or affected < 1 then
-        NotifyClient(src, _U('failed_delete_sdb'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('failed_delete_sdb'), 'error', 4000)
         cb(false)
         return
     end
@@ -502,15 +502,15 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DeleteSDB', function(params, 
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Safety Deposit Box Deleted', lines, 15158332)
     AddCharacterTransaction(characterId, 0, 'sdb - deleted', 'Deleted SDB #' .. tostring(sdbId) .. ' at ' .. tostring(BccBanksInternal.getBankName(row.bank_id)))
-    NotifyClient(src, _U('sdb_deleted_notify'), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('sdb_deleted_notify'), 'success', 4000)
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBAccessList', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetSDBAccessList', function(params, cb, src)
     local sdbId = NormalizeId(params and params.sdb_id)
     if not sdbId then
         devPrint("GetSDBAccessList: invalid sdbId", params and params.sdb_id)
-        NotifyClient(src, _U('error_invalid_sdb_id'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_sdb_id'), 'error', 4000)
         cb(false)
         return
     end
@@ -519,12 +519,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBAccessList', function(p
     local char = user
     local requesterId = char and char.characterId
     if not requesterId or not (IsSDBOwner(sdbId, requesterId) or IsSDBAdmin(sdbId, requesterId)) then
-        NotifyClient(src, _U('error_no_permission'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), 'error', 4000)
         cb(false)
         return
     end
     if not IsPlayerNearBank(src, getSDBBankId(sdbId)) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -552,7 +552,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetSDBAccessList', function(p
     cb(true, { access = accessList })
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:AddSDBAccess', function(params, cb, src)
     devPrint("AddSDBAccess RPC called. src=", src, "params=", params)
 
     local user          = GetBankingContext(src)
@@ -560,14 +560,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
     do
         if not user then
             devPrint("AddSDBAccess: requester user not found")
-            NotifyClient(src, _U('error_invalid_data_provided'), "error", 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data_provided'), "error", 4000)
             cb(false)
             return
         end
         local ch = user
         if not ch then
             devPrint("AddSDBAccess: requester character not found")
-            NotifyClient(src, _U('error_invalid_data_provided'), "error", 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data_provided'), "error", 4000)
             cb(false)
             return
         end
@@ -584,7 +584,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
     if not requesterId or not sdbId or not IsValidAccessLevel(level)
         or (not otherCharId and (firstName == '' or lastName == '')) then
         devPrint("AddSDBAccess: Invalid input data.")
-        NotifyClient(src, _U('error_invalid_data_provided'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data_provided'), "error", 4000)
         cb(false)
         return
     end
@@ -594,7 +594,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
         otherCharId = GetCharacterByName(firstName, lastName)
         if not otherCharId then
             devPrint("AddSDBAccess: character not found for name:", firstName, lastName)
-            NotifyClient(src, _U('error_target_character_not_found'), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_target_character_not_found'), 'error', 4000)
             cb(false)
             return
         end
@@ -604,7 +604,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
         local profile = provider and provider.GetProfile and provider.GetProfile(tostring(otherCharId)) or nil
         if not profile or profile.ok ~= true then
             devPrint("AddSDBAccess: Feather character not found ->", otherCharId)
-            NotifyClient(src, _U('error_target_character_not_found'), "error", 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_target_character_not_found'), "error", 4000)
             cb(false)
             return
         end
@@ -613,12 +613,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
     -- Permission check
     if not (IsSDBAdmin(sdbId, requesterId) or IsSDBOwner(sdbId, requesterId)) then
         devPrint("AddSDBAccess: Source", requesterId, "is not admin or owner of SDB", sdbId)
-        NotifyClient(src, _U('error_no_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), "error", 4000)
         cb(false)
         return
     end
     if not IsPlayerNearBank(src, getSDBBankId(sdbId)) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -626,7 +626,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
     -- Prevent giving access to self
     if requesterId == otherCharId then
         devPrint("AddSDBAccess: Attempted to give access to self.")
-        NotifyClient(src, _U('warn_you_already_have_access_box'), "warning", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('warn_you_already_have_access_box'), "warning", 4000)
         cb(false)
         return
     end
@@ -639,7 +639,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
 
     if already and already[1] then
         devPrint("AddSDBAccess: Target already has access. sdbId=", sdbId, "charId=", otherCharId)
-        NotifyClient(src, _U('warn_already_has_access_box'), "warning", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('warn_already_has_access_box'), "warning", 4000)
         cb(false)
         return
     end
@@ -664,17 +664,17 @@ exports['feather-core']:RegisterRPC('Feather:Banks:AddSDBAccess', function(param
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Safety Deposit Box Access Granted', lines, 5763719)
-    NotifyClient(src, _U('success_access_granted'), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_access_granted'), "success", 4000)
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:RemoveSDBAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:RemoveSDBAccess', function(params, cb, src)
     devPrint("RemoveSDBAccess RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("RemoveSDBAccess: requester not found")
-        NotifyClient(src, _U('error_invalid_input'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), "error", 4000)
         cb(false)
         return
     end
@@ -688,7 +688,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RemoveSDBAccess', function(pa
     -- Validate input
     if not requesterId or not sdbId or not targetCharId then
         devPrint("RemoveSDBAccess: Invalid input data.")
-        NotifyClient(src, _U('error_invalid_input'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), "error", 4000)
         cb(false)
         return
     end
@@ -696,12 +696,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RemoveSDBAccess', function(pa
     -- Permission check
     if not (IsSDBAdmin(sdbId, requesterId) or IsSDBOwner(sdbId, requesterId)) then
         devPrint("RemoveSDBAccess: Character", requesterId, "is not admin or owner of SDB", sdbId)
-        NotifyClient(src, _U('error_no_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), "error", 4000)
         cb(false)
         return
     end
     if not IsPlayerNearBank(src, getSDBBankId(sdbId)) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -710,12 +710,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RemoveSDBAccess', function(pa
 
     if not result or result.status == false then
         devPrint("RemoveSDBAccess: Failed to remove access.")
-        NotifyClient(src, _U('error_failed_remove_access'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_failed_remove_access'), "error", 4000)
         cb(false)
         return
     end
 
-    NotifyClient(src, _U('success_access_removed'), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_access_removed'), "success", 4000)
     AddCharacterTransaction(requesterId, 0, 'sdb access - removed', 'Removed SDB #' .. tostring(sdbId) .. ' access from character #' .. tostring(targetCharId))
     local sdbRow = BccBanksInternal.getSDBSummary(sdbId)
     local lines = {

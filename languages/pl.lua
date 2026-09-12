@@ -1,4 +1,4 @@
-Locales["pl_lang"] = {
+Feather.Locale.register("pl", {
     bank_label = "Bank",
     door_prompt_group = "Drzwi",
     door_open_prompt = "Otworz drzwi",
@@ -524,4 +524,4 @@ Locales["pl_lang"] = {
     error_loan_operation_busy = "Ta pożyczka jest już aktualizowana. Spróbuj ponownie.",
     error_financial_operation_busy = "Trwa już inna operacja finansowa. Spróbuj ponownie.",
     error_unable_withdraw = "Nie udało się ukończyć wypłaty.",
-}
+})

@@ -34,12 +34,12 @@ local function OpenLoanTransactionsPage(loanIdStr, parentPage)
 
     local txPage = FeatherBankMenu:RegisterPage('bank:page:loans:transactions:' .. tostring(loanIdStr))
     txPage:RegisterElement('header', {
-        value = _U('loan_transactions_header') or 'Loan Transactions',
+        value = Feather.Locale.translateUpper('loan_transactions_header') or 'Loan Transactions',
         slot  = 'header'
     })
     txPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, txRows = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoanTransactions', { loan = loanIdStr })
+    local ok, txRows = exports['feather-core']:CallRPCAsync('bcc-banks:GetLoanTransactions', { loan = loanIdStr })
     txRows = (ok and txRows) or {}
 
     if #txRows > 0 then
@@ -48,10 +48,10 @@ local function OpenLoanTransactionsPage(loanIdStr, parentPage)
             <table style="width:100%; border-collapse:collapse;">
                 <thead>
                     <tr style="background:#f1f3f5;">
-                        <th style="text-align:left; padding:6px 4px;">]] .. (_U('loan_transactions_date') or 'Date') .. [[</th>
-                        <th style="text-align:left; padding:6px 4px;">]] .. (_U('loan_transactions_type') or 'Type') .. [[</th>
-                        <th style="text-align:left; padding:6px 4px;">]] .. (_U('loan_transactions_desc') or 'Description') .. [[</th>
-                        <th style="text-align:right; padding:6px 4px;">]] .. (_U('loan_transactions_amount') or 'Amount') .. [[</th>
+                        <th style="text-align:left; padding:6px 4px;">]] .. (Feather.Locale.translateUpper('loan_transactions_date') or 'Date') .. [[</th>
+                        <th style="text-align:left; padding:6px 4px;">]] .. (Feather.Locale.translateUpper('loan_transactions_type') or 'Type') .. [[</th>
+                        <th style="text-align:left; padding:6px 4px;">]] .. (Feather.Locale.translateUpper('loan_transactions_desc') or 'Description') .. [[</th>
+                        <th style="text-align:right; padding:6px 4px;">]] .. (Feather.Locale.translateUpper('loan_transactions_amount') or 'Amount') .. [[</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,14 +81,14 @@ local function OpenLoanTransactionsPage(loanIdStr, parentPage)
         })
     else
         txPage:RegisterElement('textdisplay', {
-            value = _U('loan_transactions_empty') or 'No loan transactions recorded yet.',
+            value = Feather.Locale.translateUpper('loan_transactions_empty') or 'No loan transactions recorded yet.',
             slot  = 'content'
         })
     end
 
     txPage:RegisterElement('line', { slot = 'footer', style = {} })
     txPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -105,24 +105,24 @@ end
 function OpenUI(bank)
     local bankId = getBankId(bank)
     if not bankId then
-        Notify(_U('admin_invalid_bank_id') or 'Invalid bank id.', 'error', 3500)
+        Notify(Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id.', 'error', 3500)
         return
     end
 
     if Config.UseBankerBusy then
-        local acquired = exports['feather-core']:CallRPCAsync('Feather:Banks:SetBankerBusy', { bank = bankId, state = true })
+        local acquired = exports['feather-core']:CallRPCAsync('bcc-banks:SetBankerBusy', { bank = bankId, state = true })
         if not acquired then
-            Notify(_U("banker_busy_notify"), 4000)
+            Notify(Feather.Locale.translateUpper("banker_busy_notify"), 4000)
             return
         end
     end
     local MainPage = FeatherBankMenu:RegisterPage('bank:page:hub:' .. tostring(bankId))
     MainPage:RegisterElement('header', {
-        value = _U("banking_header"),
+        value = Feather.Locale.translateUpper("banking_header"),
         slot = "header"
     })
     MainPage:RegisterElement('subheader', {
-        value = _U("banking_subheader"),
+        value = Feather.Locale.translateUpper("banking_subheader"),
         slot = "header"
     })
     MainPage:RegisterElement('line', {
@@ -130,32 +130,32 @@ function OpenUI(bank)
         style = {}
     })
     MainPage:RegisterElement('button', {
-        label = _U("accounts_button"),
+        label = Feather.Locale.translateUpper("accounts_button"),
         style = {}
     }, function()
         OpenAccountsListPage(bank, MainPage)
     end)
     MainPage:RegisterElement('button', {
-        label = _U("safety_deposit_box_button"),
+        label = Feather.Locale.translateUpper("safety_deposit_box_button"),
         style = {}
     }, function()
         OpenSDBListPage(bank, MainPage)
     end)
     MainPage:RegisterElement('button', {
-        label = _U("gold_exchange_button"),
+        label = Feather.Locale.translateUpper("gold_exchange_button"),
         style = {}
     }, function()
         OpenGoldExchangePage(bank, MainPage)
     end)
     MainPage:RegisterElement('button', {
-        label = _U("loans_button"),
+        label = Feather.Locale.translateUpper("loans_button"),
         style = {}
     }, function()
         OpenLoansBankPage(bank, MainPage)
     end)
     if Config.Checks and Config.Checks.Enabled and not Config.Checks.UseItem then
         MainPage:RegisterElement('button', {
-            label = _U("checks_button"),
+            label = Feather.Locale.translateUpper("checks_button"),
             style = {}
         }, function()
             OpenCashCheckPage(bank, MainPage)
@@ -166,7 +166,7 @@ function OpenUI(bank)
         style = {}
     })
     MainPage:RegisterElement('button', {
-        label = _U("exit_button"),
+        label = Feather.Locale.translateUpper("exit_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -184,21 +184,21 @@ function OpenTransactionsPage(acc, ParentPage)
     local accountNumber = acc.account_number or acc.id
     local TransactionPage = FeatherBankMenu:RegisterPage('account:page:transactions:' .. tostring(acc.id))
     TransactionPage:RegisterElement('header', {
-        value = _U("transactions_header"),
+        value = Feather.Locale.translateUpper("transactions_header"),
         slot = 'header'
     })
     TransactionPage:RegisterElement('subheader', {
-        value = _U("transactions_subheader", tostring(accountNumber)),
+        value = Feather.Locale.translateUpper("transactions_subheader", tostring(accountNumber)),
         slot = 'header'
     })
     TransactionPage:RegisterElement('line', {
         slot = 'header',
         style = {}
     })
-    local ok, data = exports['feather-core']:CallRPCAsync('Feather:Banks:GetTransactions', { account = NormalizeId(acc.id) })
+    local ok, data = exports['feather-core']:CallRPCAsync('bcc-banks:GetTransactions', { account = NormalizeId(acc.id) })
     devPrint("RPC call status:", ok)
     if not ok then
-        local msg = (data and data.message) and data.message or _U("failed_fetch_transactions")
+        local msg = (data and data.message) and data.message or Feather.Locale.translateUpper("failed_fetch_transactions")
         devPrint("RPC failed:", msg)
         Notify(msg, 4000)
         return
@@ -210,7 +210,7 @@ function OpenTransactionsPage(acc, ParentPage)
     end
     if #data == 0 then
         TransactionPage:RegisterElement('textdisplay', {
-            value = _U("no_transactions_found"),
+            value = Feather.Locale.translateUpper("no_transactions_found"),
             slot = "content"
         })
     else
@@ -229,12 +229,12 @@ function OpenTransactionsPage(acc, ParentPage)
               <table style="width:100%; border-collapse:collapse; font-size:14px;">
                 <thead>
                   <tr style="background:#f1f3f5; color:#212529;">
-                    <th style="text-align:left; padding:8px 6px; width:10%">]] .. _U("transaction_id") .. [[</th>
-                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. _U("transaction_when") .. [[</th>
-                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. _U("transaction_by") .. [[</th>
-                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. _U("transaction_type") .. [[</th>
-                    <th style="text-align:right; padding:8px 6px; width:18%">]] .. _U("transaction_amount") .. [[</th>
-                    <th style="text-align:left; padding:8px 6px;">]] .. _U("transaction_description") .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:10%">]] .. Feather.Locale.translateUpper("transaction_id") .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. Feather.Locale.translateUpper("transaction_when") .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. Feather.Locale.translateUpper("transaction_by") .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. Feather.Locale.translateUpper("transaction_type") .. [[</th>
+                    <th style="text-align:right; padding:8px 6px; width:18%">]] .. Feather.Locale.translateUpper("transaction_amount") .. [[</th>
+                    <th style="text-align:left; padding:8px 6px;">]] .. Feather.Locale.translateUpper("transaction_description") .. [[</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -268,7 +268,7 @@ function OpenTransactionsPage(acc, ParentPage)
         style = {}
     })
     TransactionPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot = "footer",
         style = {}
     }, function()
@@ -284,17 +284,17 @@ end
 function OpenLoansBankPage(bank, ParentPage)
     local LoansBankPage = FeatherBankMenu:RegisterPage('bank:page:loans:' .. tostring(bank.id))
     LoansBankPage:RegisterElement('header', {
-        value = _U("loans_header"),
+        value = Feather.Locale.translateUpper("loans_header"),
         slot = 'header'
     })
     LoansBankPage:RegisterElement('subheader', {
-        value = _U("loans_subheader"),
+        value = Feather.Locale.translateUpper("loans_subheader"),
         slot = 'header'
     })
     LoansBankPage:RegisterElement('line', { slot = 'header', style = {} })
 
     LoansBankPage:RegisterElement('button', {
-        label = _U("apply_loan_button"),
+        label = Feather.Locale.translateUpper("apply_loan_button"),
         style = {}
     }, function()
         -- Apply directly: create a dedicated account automatically on server
@@ -303,14 +303,14 @@ function OpenLoansBankPage(bank, ParentPage)
 
     -- New: list loans button (directly shows your loans at this bank)
     LoansBankPage:RegisterElement('button', {
-        label = _U("view_loans_button"),
+        label = Feather.Locale.translateUpper("view_loans_button"),
         style = {}
     }, function()
         OpenLoansListPage_NoAccount(bank, LoansBankPage)
     end)
 
     LoansBankPage:RegisterElement('button', {
-        label = _U("repay_loan_button"),
+        label = Feather.Locale.translateUpper("repay_loan_button"),
         style = {}
     }, function()
         OpenLoansListPage_NoAccount(bank, LoansBankPage)
@@ -318,7 +318,7 @@ function OpenLoansBankPage(bank, ParentPage)
 
     LoansBankPage:RegisterElement('line', { slot = "footer", style = {} })
     LoansBankPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -334,19 +334,19 @@ end
 function OpenLoanApplyAccountSelect(bank, ParentPage)
     local LoanApplySelectAccountPage = FeatherBankMenu:RegisterPage('bank:page:loans:apply:select:' .. tostring(bank.id))
     LoanApplySelectAccountPage:RegisterElement('header', {
-        value = _U('select_account_header'),
+        value = Feather.Locale.translateUpper('select_account_header'),
         slot  = 'header'
     })
     LoanApplySelectAccountPage:RegisterElement('subheader', {
-        value = _U('select_account_subheader'),
+        value = Feather.Locale.translateUpper('select_account_subheader'),
         slot  = 'header'
     })
     LoanApplySelectAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('bcc-banks:GetAccounts', { bank = bank.id })
     if not ok or not accounts or #accounts == 0 then
         LoanApplySelectAccountPage:RegisterElement('textdisplay', {
-            value = _U('no_accounts_found'),
+            value = Feather.Locale.translateUpper('no_accounts_found'),
             slot  = 'content'
         })
     else
@@ -362,7 +362,7 @@ function OpenLoanApplyAccountSelect(bank, ParentPage)
 
     LoanApplySelectAccountPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoanApplySelectAccountPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -378,60 +378,60 @@ end
 function OpenLoanApplyForm(account, bank, ParentPage)
     local LoanApplyFormPage = FeatherBankMenu:RegisterPage('bank:page:loans:apply:form:' .. tostring(account.id))
     LoanApplyFormPage:RegisterElement('header', { 
-        value = _U('apply_loan_header'), 
+        value = Feather.Locale.translateUpper('apply_loan_header'), 
         slot = 'header' 
     })
     LoanApplyFormPage:RegisterElement('subheader', {
-        value = _U('account_name_label') .. ' ' .. ((account.account_name or account.name or '')),
+        value = Feather.Locale.translateUpper('account_name_label') .. ' ' .. ((account.account_name or account.name or '')),
         slot  = 'header'
     })
     LoanApplyFormPage:RegisterElement('line', { slot = 'header', style = {} })
 
     local amountValue = ''
     LoanApplyFormPage:RegisterElement('input', { 
-        label = _U('loan_amount_label'), 
-        placeholder = _U('loan_amount_placeholder'), 
+        label = Feather.Locale.translateUpper('loan_amount_label'), 
+        placeholder = Feather.Locale.translateUpper('loan_amount_placeholder'), 
         style = {} 
     }, function(data)
         amountValue = data.value
     end)
 
     -- Fetch server-defined interest rate for this character/account
-    local okRate, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoanRate', { account = NormalizeId(account.id) })
+    local okRate, rate = exports['feather-core']:CallRPCAsync('bcc-banks:GetLoanRate', { account = NormalizeId(account.id) })
     rate = tonumber(rate) or 10.0
     LoanApplyFormPage:RegisterElement('textdisplay', {
-        value = _U('loan_interest_label') .. ': ' .. tostring(rate) .. '%',
+        value = Feather.Locale.translateUpper('loan_interest_label') .. ': ' .. tostring(rate) .. '%',
         style = {}
     })
 
     local durationValue = ''
     LoanApplyFormPage:RegisterElement('input', { 
-        label = _U('loan_duration_label'), 
-        placeholder = _U('loan_duration_placeholder'), 
+        label = Feather.Locale.translateUpper('loan_duration_label'), 
+        placeholder = Feather.Locale.translateUpper('loan_duration_placeholder'), 
         style = {} 
     }, function(data)
         durationValue = data.value
     end)
 
     LoanApplyFormPage:RegisterElement('button', {
-        label = _U('create_loan_button'),
+        label = Feather.Locale.translateUpper('create_loan_button'),
         style = {}
     }, function()
         local amount = tonumber(amountValue)
         local duration = tonumber(durationValue)
         if not amount or amount <= 0 then
-            Notify(_U('invalid_loan_amount'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_loan_amount'), 4000)
             return
         end
         if not duration or duration < 1 or duration % 1 ~= 0 or duration > 120 then
-            Notify(_U('invalid_duration'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_duration'), 4000)
             return
         end
 
         local total = amount * (1 + (rate / 100))
         local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:loans:apply:confirm:' .. tostring(account.id))
         ConfirmPage:RegisterElement('header', {
-            value = _U('confirm_loan_header'),
+            value = Feather.Locale.translateUpper('confirm_loan_header'),
             slot  = 'header'
         })
         local function toFixed(n, decimals)
@@ -454,19 +454,19 @@ function OpenLoanApplyForm(account, bank, ParentPage)
         end
 
         ConfirmPage:RegisterElement('textdisplay', {
-            value = _U('confirm_loan_text', toFixed(amount, 2), toFixed(rate, 2), tostring(math.floor(duration)), toFixed(total, 2)),
+            value = Feather.Locale.translateUpper('confirm_loan_text', toFixed(amount, 2), toFixed(rate, 2), tostring(math.floor(duration)), toFixed(total, 2)),
             style = { ['text-align'] = 'center' }
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('confirm_button')
+            label = Feather.Locale.translateUpper('confirm_button')
         }, function()
-            local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:CreateLoan', {
+            local ok = exports['feather-core']:CallRPCAsync('bcc-banks:CreateLoan', {
                 account = NormalizeId(account.id),
                 amount = amount,
                 duration = duration
             })
             if ok then
-                Notify(_U('loan_created_notify'), 'success', 4000)
+                Notify(Feather.Locale.translateUpper('loan_created_notify'), 'success', 4000)
             end
             OpenLoanApplyAccountSelect(bank, ParentPage)
         end)
@@ -475,7 +475,7 @@ function OpenLoanApplyForm(account, bank, ParentPage)
             style = {}
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('back_button'),
+            label = Feather.Locale.translateUpper('back_button'),
             slot  = 'footer',
             style = {}
         }, function()
@@ -490,7 +490,7 @@ function OpenLoanApplyForm(account, bank, ParentPage)
 
     LoanApplyFormPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoanApplyFormPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -507,52 +507,52 @@ end
 function OpenLoanApplyForm_NoAccount(bank, ParentPage)
     local LoanApplyFormNoAccountPage = FeatherBankMenu:RegisterPage('bank:page:loans:apply:form:noacct:' .. tostring(bank.id))
     LoanApplyFormNoAccountPage:RegisterElement('header', {
-        value = _U('apply_loan_header'),
+        value = Feather.Locale.translateUpper('apply_loan_header'),
         slot  = 'header'
     })
     LoanApplyFormNoAccountPage:RegisterElement('subheader', {
-        value = _U('loan_account_auto_note') or _U('loans_subheader'),
+        value = Feather.Locale.translateUpper('loan_account_auto_note') or Feather.Locale.translateUpper('loans_subheader'),
         slot  = 'header'
     })
     LoanApplyFormNoAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
     local amountValue = ''
-    LoanApplyFormNoAccountPage:RegisterElement('input', { label = _U('loan_amount_label'), placeholder = _U('loan_amount_placeholder'), style = {} }, function(data)
+    LoanApplyFormNoAccountPage:RegisterElement('input', { label = Feather.Locale.translateUpper('loan_amount_label'), placeholder = Feather.Locale.translateUpper('loan_amount_placeholder'), style = {} }, function(data)
         amountValue = data.value
     end)
 
     -- Fetch server-defined interest rate for this character at this bank
-    local okRate, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoanRate', { bank = bank.id })
+    local okRate, rate = exports['feather-core']:CallRPCAsync('bcc-banks:GetLoanRate', { bank = bank.id })
     rate = tonumber(rate) or 10.0
     LoanApplyFormNoAccountPage:RegisterElement('textdisplay', {
-        value = _U('interest_rate_display', tostring(rate)),
+        value = Feather.Locale.translateUpper('interest_rate_display', tostring(rate)),
         style = { ['text-align'] = 'center' }
     })
 
     local durationValue = ''
-    LoanApplyFormNoAccountPage:RegisterElement('input', { label = _U('loan_duration_label'), placeholder = _U('loan_duration_placeholder'), style = {} }, function(data)
+    LoanApplyFormNoAccountPage:RegisterElement('input', { label = Feather.Locale.translateUpper('loan_duration_label'), placeholder = Feather.Locale.translateUpper('loan_duration_placeholder'), style = {} }, function(data)
         durationValue = data.value
     end)
 
     LoanApplyFormNoAccountPage:RegisterElement('button', {
-        label = _U('create_loan_button'),
+        label = Feather.Locale.translateUpper('create_loan_button'),
         style = {}
     }, function()
         local amount = tonumber(amountValue)
         local duration = tonumber(durationValue)
         if not amount or amount <= 0 then
-            Notify(_U('invalid_loan_amount'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_loan_amount'), 4000)
             return
         end
         if not duration or duration < 1 or duration % 1 ~= 0 or duration > 120 then
-            Notify(_U('invalid_duration'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_duration'), 4000)
             return
         end
 
         local total = amount * (1 + (rate / 100))
         local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:loans:apply:confirm:noacct:' .. tostring(bank.id))
         ConfirmPage:RegisterElement('header', {
-            value = _U('confirm_loan_header'),
+            value = Feather.Locale.translateUpper('confirm_loan_header'),
             slot  = 'header'
         })
         local function toFixed(n, decimals)
@@ -574,19 +574,19 @@ function OpenLoanApplyForm_NoAccount(bank, ParentPage)
             return s
         end
         ConfirmPage:RegisterElement('textdisplay', {
-            value = _U('confirm_loan_text', toFixed(amount, 2), toFixed(rate, 2), tostring(math.floor(duration)), toFixed(total, 2)),
+            value = Feather.Locale.translateUpper('confirm_loan_text', toFixed(amount, 2), toFixed(rate, 2), tostring(math.floor(duration)), toFixed(total, 2)),
             style = { ['text-align'] = 'center' }
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('confirm_button')
+            label = Feather.Locale.translateUpper('confirm_button')
         }, function()
-            local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:CreateLoan', {
+            local ok = exports['feather-core']:CallRPCAsync('bcc-banks:CreateLoan', {
                 bank = bank.id,
                 amount = amount,
                 duration = duration
             })
             if ok then
-                Notify(_U('loan_created_notify'), 'success', 4000)
+                Notify(Feather.Locale.translateUpper('loan_created_notify'), 'success', 4000)
             end
             -- After creating, show loan list for this bank
             OpenLoansListPage_NoAccount(bank, ParentPage)
@@ -596,7 +596,7 @@ function OpenLoanApplyForm_NoAccount(bank, ParentPage)
             style = {}
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('back_button'),
+            label = Feather.Locale.translateUpper('back_button'),
             slot  = 'footer',
             style = {}
         }, function()
@@ -611,7 +611,7 @@ function OpenLoanApplyForm_NoAccount(bank, ParentPage)
 
     LoanApplyFormNoAccountPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoanApplyFormNoAccountPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -628,20 +628,20 @@ end
 function OpenLoansListPage_NoAccount(bank, ParentPage)
     local LoansListNoAccountPage = FeatherBankMenu:RegisterPage('bank:page:loans:list:noacct:' .. tostring(bank.id))
     LoansListNoAccountPage:RegisterElement('header', {
-        value = _U('loans_list_header'),
+        value = Feather.Locale.translateUpper('loans_list_header'),
         slot  = 'header'
     })
     LoansListNoAccountPage:RegisterElement('subheader', {
-        value = _U('loans_subheader'),
+        value = Feather.Locale.translateUpper('loans_subheader'),
         slot  = 'header'
     })
     LoansListNoAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, loans = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoans', { bank = bank.id })
+    local ok, loans = exports['feather-core']:CallRPCAsync('bcc-banks:GetLoans', { bank = bank.id })
     loans = loans or {}
     if not ok or #loans == 0 then
         LoansListNoAccountPage:RegisterElement('textdisplay', {
-            value = _U('no_loans_found'),
+            value = Feather.Locale.translateUpper('no_loans_found'),
             slot  = 'content'
         })
     else
@@ -650,7 +650,7 @@ function OpenLoansListPage_NoAccount(bank, ParentPage)
             local statusTxt = status ~= '' and (' (' .. status .. ')') or ''
             local createdText = loan.created_at_display or loan.created_at or '-'
             local amountText = loan.amount_formatted or formatAmount(loan.amount)
-            local label = _U('loan_label') .. statusTxt .. ' - ' .. createdText .. ' | $' .. amountText
+            local label = Feather.Locale.translateUpper('loan_label') .. statusTxt .. ' - ' .. createdText .. ' | $' .. amountText
             LoansListNoAccountPage:RegisterElement('button', {
                 label = label,
                 style = {}
@@ -662,7 +662,7 @@ function OpenLoansListPage_NoAccount(bank, ParentPage)
 
     LoansListNoAccountPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoansListNoAccountPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -678,20 +678,20 @@ end
 function OpenLoansListPage(account, bank, ParentPage)
     local LoansListPage = FeatherBankMenu:RegisterPage('bank:page:loans:list:' .. tostring(account.id))
     LoansListPage:RegisterElement('header', {
-        value = _U('loans_list_header'),
+        value = Feather.Locale.translateUpper('loans_list_header'),
         slot  = 'header'
     })
     LoansListPage:RegisterElement('subheader', {
-        value = _U('loans_subheader'),
+        value = Feather.Locale.translateUpper('loans_subheader'),
         slot  = 'header'
     })
     LoansListPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, loans = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoans', { account = NormalizeId(account.id) })
+    local ok, loans = exports['feather-core']:CallRPCAsync('bcc-banks:GetLoans', { account = NormalizeId(account.id) })
     loans = loans or {}
     if not ok or #loans == 0 then
         LoansListPage:RegisterElement('textdisplay', {
-            value = _U('no_loans_found'),
+            value = Feather.Locale.translateUpper('no_loans_found'),
             slot  = 'content'
         })
     else
@@ -700,7 +700,7 @@ function OpenLoansListPage(account, bank, ParentPage)
             local statusTxt = status ~= '' and (' (' .. status .. ')') or ''
             local createdText = loan.created_at_display or loan.created_at or '-'
             local amountText = loan.amount_formatted or formatAmount(loan.amount)
-            local label = _U('loan_label') .. statusTxt .. ' - ' .. createdText .. ' | $' .. amountText
+            local label = Feather.Locale.translateUpper('loan_label') .. statusTxt .. ' - ' .. createdText .. ' | $' .. amountText
             LoansListPage:RegisterElement('button', {
                 label = label,
                 style = {}
@@ -712,7 +712,7 @@ function OpenLoansListPage(account, bank, ParentPage)
 
     LoansListPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoansListPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -728,23 +728,23 @@ end
 function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
     local loanIdStr = NormalizeId(loanId)
     if not loanIdStr then
-        Notify(_U('failed_fetch_loan'), 4000)
+        Notify(Feather.Locale.translateUpper('failed_fetch_loan'), 4000)
         return
     end
 
-    local ok, info = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoan', { loan = loanIdStr })
+    local ok, info = exports['feather-core']:CallRPCAsync('bcc-banks:GetLoan', { loan = loanIdStr })
     if not ok or not info then
-        Notify(_U('failed_fetch_loan'), 4000)
+        Notify(Feather.Locale.translateUpper('failed_fetch_loan'), 4000)
         return
     end
 
     local LoanDetailsPage = FeatherBankMenu:RegisterPage('bank:page:loans:details:' .. tostring(loanIdStr))
     LoanDetailsPage:RegisterElement('header', {
-        value = _U('loan_details_header'),
+        value = Feather.Locale.translateUpper('loan_details_header'),
         slot  = 'header'
     })
     LoanDetailsPage:RegisterElement('subheader', { 
-        value = _U('loan_label'), 
+        value = Feather.Locale.translateUpper('loan_label'), 
         slot = 'header' 
     })
     LoanDetailsPage:RegisterElement('line', { 
@@ -753,9 +753,9 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
     })
     local summaryHtml = [[
         <div style="padding:10px;">
-            <div><b>]] .. _U('total_due_label') .. [[</b> $]] .. tostring(info.total_due) .. [[</div>
-            <div><b>]] .. _U('repaid_label') .. [[</b> $]] .. tostring(info.repaid) .. [[</div>
-            <div><b>]] .. _U('outstanding_label') .. [[</b> $]] .. tostring(info.outstanding) .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper('total_due_label') .. [[</b> $]] .. tostring(info.total_due) .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper('repaid_label') .. [[</b> $]] .. tostring(info.repaid) .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper('outstanding_label') .. [[</b> $]] .. tostring(info.outstanding) .. [[</div>
         </div>
     ]]
     LoanDetailsPage:RegisterElement('html', { value = { summaryHtml } })
@@ -765,7 +765,7 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
     local outstandingValue = tonumber(info.outstanding or 0) or 0
 
     LoanDetailsPage:RegisterElement('button', {
-        label = _U('loan_transactions_button') or 'View Transactions',
+        label = Feather.Locale.translateUpper('loan_transactions_button') or 'View Transactions',
         style = {}
     }, function()
         OpenLoanTransactionsPage(loanIdStr, LoanDetailsPage)
@@ -773,22 +773,22 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
 
     if outstandingValue > 0 and loanStatus ~= 'paid' then
         local repayValue = ''
-        LoanDetailsPage:RegisterElement('input', { label = _U('repay_amount_label'), placeholder = _U('repay_amount_placeholder'), style = {} }, function(data)
+        LoanDetailsPage:RegisterElement('input', { label = Feather.Locale.translateUpper('repay_amount_label'), placeholder = Feather.Locale.translateUpper('repay_amount_placeholder'), style = {} }, function(data)
             repayValue = data.value
         end)
 
         LoanDetailsPage:RegisterElement('button', {
-            label = _U('repay_loan_button'),
+            label = Feather.Locale.translateUpper('repay_loan_button'),
             style = {}
         }, function()
             local amt = tonumber(repayValue)
             if not amt or amt <= 0 then
-                Notify(_U('invalid_repay_amount'), 4000)
+                Notify(Feather.Locale.translateUpper('invalid_repay_amount'), 4000)
                 return
             end
             local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:loans:repay:confirm:' .. tostring(loanIdStr))
     ConfirmPage:RegisterElement('header', {
-        value = _U('confirm_repay_header'),
+        value = Feather.Locale.translateUpper('confirm_repay_header'),
         slot  = 'header'
     })
         local function toFixed(n, decimals)
@@ -810,18 +810,18 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
             return s
         end
         ConfirmPage:RegisterElement('textdisplay', {
-            value = _U('confirm_repay_text', toFixed(amt, 2), tostring(loanIdStr)),
+            value = Feather.Locale.translateUpper('confirm_repay_text', toFixed(amt, 2), tostring(loanIdStr)),
             style = { ['text-align'] = 'center' }
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('confirm_button')
+            label = Feather.Locale.translateUpper('confirm_button')
         }, function()
-            exports['feather-core']:CallRPCAsync('Feather:Banks:RepayLoan', { loan = loanIdStr, amount = amt })
+            exports['feather-core']:CallRPCAsync('bcc-banks:RepayLoan', { loan = loanIdStr, amount = amt })
             OpenLoanDetailsPage(account, bank, loanIdStr, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
         ConfirmPage:RegisterElement('button', {
-            label = _U('back_button'),
+            label = Feather.Locale.translateUpper('back_button'),
             slot  = 'footer',
             style = {}
         }, function()
@@ -835,14 +835,14 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
     end)
     else
         LoanDetailsPage:RegisterElement('textdisplay', {
-            value = _U('loan_paid_label') or 'Loan is fully repaid.',
+            value = Feather.Locale.translateUpper('loan_paid_label') or 'Loan is fully repaid.',
             slot  = 'content'
         })
     end
 
     LoanDetailsPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoanDetailsPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -859,29 +859,29 @@ end
 function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
     local loanIdStr = NormalizeId(loanId)
     if not loanIdStr then
-        Notify(_U('failed_fetch_loan'), 4000)
+        Notify(Feather.Locale.translateUpper('failed_fetch_loan'), 4000)
         return
     end
 
-    local ok, info = exports['feather-core']:CallRPCAsync('Feather:Banks:GetLoan', { loan = loanIdStr })
+    local ok, info = exports['feather-core']:CallRPCAsync('bcc-banks:GetLoan', { loan = loanIdStr })
     if not ok or not info then
-        Notify(_U('failed_fetch_loan'), 4000)
+        Notify(Feather.Locale.translateUpper('failed_fetch_loan'), 4000)
         return
     end
 
     local LoanDetailsNoAccountPage = FeatherBankMenu:RegisterPage('bank:page:loans:details:noacct:' .. tostring(loanIdStr))
     LoanDetailsNoAccountPage:RegisterElement('header', {
-        value = _U('loan_details_header'),
+        value = Feather.Locale.translateUpper('loan_details_header'),
         slot  = 'header'
     })
-    LoanDetailsNoAccountPage:RegisterElement('subheader', { value = _U('loan_label') .. ' #' .. tostring(loanIdStr), slot = 'header' })
+    LoanDetailsNoAccountPage:RegisterElement('subheader', { value = Feather.Locale.translateUpper('loan_label') .. ' #' .. tostring(loanIdStr), slot = 'header' })
     LoanDetailsNoAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
     local summaryHtml = [[
         <div style="padding:10px;">
-            <div><b>]] .. _U('total_due_label') .. [[</b> $]] .. tostring(info.total_due) .. [[</div>
-            <div><b>]] .. _U('repaid_label') .. [[</b> $]] .. tostring(info.repaid) .. [[</div>
-            <div><b>]] .. _U('outstanding_label') .. [[</b> $]] .. tostring(info.outstanding) .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper('total_due_label') .. [[</b> $]] .. tostring(info.total_due) .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper('repaid_label') .. [[</b> $]] .. tostring(info.repaid) .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper('outstanding_label') .. [[</b> $]] .. tostring(info.outstanding) .. [[</div>
         </div>
     ]]
     LoanDetailsNoAccountPage:RegisterElement('html', { value = { summaryHtml } })
@@ -891,7 +891,7 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
     local outstandingValue = tonumber(info.outstanding or 0) or 0
 
     LoanDetailsNoAccountPage:RegisterElement('button', {
-        label = _U('loan_transactions_button') or 'View Transactions',
+        label = Feather.Locale.translateUpper('loan_transactions_button') or 'View Transactions',
         style = {}
     }, function()
         OpenLoanTransactionsPage(loanIdStr, LoanDetailsNoAccountPage)
@@ -901,7 +901,7 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
     if info and info.loan and tostring(info.loan.status) == 'approved' and not info.loan.disbursed_account_id then
     LoanDetailsNoAccountPage:RegisterElement('line', { slot = 'content', style = {} })
     LoanDetailsNoAccountPage:RegisterElement('button', {
-        label = _U('loan_claim_button') or 'Transfer funds to account',
+        label = Feather.Locale.translateUpper('loan_claim_button') or 'Transfer funds to account',
         style = {}
     }, function()
             OpenLoanClaimSelectAccount(bank, loanId, LoanDetailsNoAccountPage)
@@ -910,22 +910,22 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
 
     if outstandingValue > 0 and loanStatus ~= 'paid' then
         local repayValue = ''
-        LoanDetailsNoAccountPage:RegisterElement('input', { label = _U('repay_amount_label'), placeholder = _U('repay_amount_placeholder'), style = {} }, function(data)
+        LoanDetailsNoAccountPage:RegisterElement('input', { label = Feather.Locale.translateUpper('repay_amount_label'), placeholder = Feather.Locale.translateUpper('repay_amount_placeholder'), style = {} }, function(data)
             repayValue = data.value
         end)
 
         LoanDetailsNoAccountPage:RegisterElement('button', {
-            label = _U('repay_loan_button'),
+            label = Feather.Locale.translateUpper('repay_loan_button'),
             style = {}
         }, function()
             local amt = tonumber(repayValue)
             if not amt or amt <= 0 then
-                Notify(_U('invalid_repay_amount'), 4000)
+                Notify(Feather.Locale.translateUpper('invalid_repay_amount'), 4000)
                 return
             end
             local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:loans:repay:confirm:noacct:' .. tostring(loanId))
         ConfirmPage:RegisterElement('header', {
-            value = _U('confirm_repay_header'),
+            value = Feather.Locale.translateUpper('confirm_repay_header'),
             slot  = 'header'
         })
             local function toFixed(n, decimals)
@@ -947,18 +947,18 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
                 return s
             end
             ConfirmPage:RegisterElement('textdisplay', {
-                value = _U('confirm_repay_text', toFixed(amt, 2), tostring(loanId)),
+                value = Feather.Locale.translateUpper('confirm_repay_text', toFixed(amt, 2), tostring(loanId)),
                 style = { ['text-align'] = 'center' }
             })
             ConfirmPage:RegisterElement('button', {
-                label = _U('confirm_button')
+                label = Feather.Locale.translateUpper('confirm_button')
             }, function()
-                exports['feather-core']:CallRPCAsync('Feather:Banks:RepayLoan', { loan = loanId, amount = amt })
+                exports['feather-core']:CallRPCAsync('bcc-banks:RepayLoan', { loan = loanId, amount = amt })
                 OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
             end)
             ConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
             ConfirmPage:RegisterElement('button', {
-                label = _U('back_button'),
+                label = Feather.Locale.translateUpper('back_button'),
                 slot  = 'footer',
                 style = {}
             }, function()
@@ -972,14 +972,14 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
         end)
     else
         LoanDetailsNoAccountPage:RegisterElement('textdisplay', {
-            value = _U('loan_paid_label') or 'Loan is fully repaid.',
+            value = Feather.Locale.translateUpper('loan_paid_label') or 'Loan is fully repaid.',
             slot  = 'content'
         })
     end
 
     LoanDetailsNoAccountPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoanDetailsNoAccountPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -996,23 +996,23 @@ end
 function OpenLoanClaimSelectAccount(bank, loanId, ParentPage)
     local LoanClaimSelectAccountPage = FeatherBankMenu:RegisterPage('bank:page:loans:claim:select:noacct:' .. tostring(bank.id) .. ':' .. tostring(loanId))
     LoanClaimSelectAccountPage:RegisterElement('header', {
-        value = _U('loan_claim_select_account') or 'Select account to receive funds',
+        value = Feather.Locale.translateUpper('loan_claim_select_account') or 'Select account to receive funds',
         slot  = 'header'
     })
     LoanClaimSelectAccountPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('bcc-banks:GetAccounts', { bank = bank.id })
     if not ok or not accounts or #accounts == 0 then
-        LoanClaimSelectAccountPage:RegisterElement('textdisplay', { value = _U('no_accounts_found'), slot = 'content' })
+        LoanClaimSelectAccountPage:RegisterElement('textdisplay', { value = Feather.Locale.translateUpper('no_accounts_found'), slot = 'content' })
     else
         for _, account in ipairs(accounts) do
         LoanClaimSelectAccountPage:RegisterElement('button', {
             label = account.account_name,
             style = {}
         }, function()
-                local success = exports['feather-core']:CallRPCAsync('Feather:Banks:ClaimLoanDisbursement', { loan = NormalizeId(loanId), account = NormalizeId(account.id) })
+                local success = exports['feather-core']:CallRPCAsync('bcc-banks:ClaimLoanDisbursement', { loan = NormalizeId(loanId), account = NormalizeId(account.id) })
                 if success then
-                    Notify(_U('loan_claim_success') or 'Funds transferred to account.', 'success', 4000)
+                    Notify(Feather.Locale.translateUpper('loan_claim_success') or 'Funds transferred to account.', 'success', 4000)
                 end
                 OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
             end)
@@ -1021,7 +1021,7 @@ function OpenLoanClaimSelectAccount(bank, loanId, ParentPage)
 
     LoanClaimSelectAccountPage:RegisterElement('line', { slot = 'footer', style = {} })
     LoanClaimSelectAccountPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
