@@ -74,7 +74,7 @@ local function canInteractWithDoor(ped, doorHash, pos)
 end
 
 local function textOrFallback(key, fallback)
-  local value = _U(key)
+  local value = Feather.Locale.translateUpper(key)
   if type(value) ~= 'string' or value == key or value == '' or value:find('Translation %[', 1, true) == 1 then
     return fallback
   end
@@ -94,7 +94,7 @@ local function hasDoorBypassAccess()
   if not bypassAccessCache.refreshing then
     bypassAccessCache.refreshing = true
     CreateThread(function()
-      local ok, allowed = exports['feather-core']:CallRPCAsync('Feather:Banks:CheckAdmin', {})
+      local ok, allowed = exports['feather-core']:CallRPCAsync('bcc-banks:CheckAdmin', {})
       bypassAccessCache.checkedAt = GetGameTimer()
       bypassAccessCache.allowed = ok and allowed == true
       bypassAccessCache.refreshing = false
@@ -105,24 +105,16 @@ local function hasDoorBypassAccess()
 end
 
 local function setDoorStateBypass(doorHash, state)
-  TriggerServerEvent('feather-banks:lockpick:bypassSetDoorState', doorHash, state)
+  exports['feather-core']:CallRPCAsync('bcc-banks:lockpick:bypassSetDoorState', { doorHash = doorHash, state = state })
 end
 
 local function tryLockpickDoor(doorHash)
   -- Every attempt receives a short-lived server authorization. Item possession is
   -- additionally checked server-side when RequireItem is enabled.
-  local p = promise.new()
-  local handler
-  handler = AddEventHandler('feather-banks:lockpick:canStart:cb', function(can)
-    if handler then RemoveEventHandler(handler) end
-    handler = nil
-    p:resolve(can and true or false)
-  end)
-  TriggerServerEvent('feather-banks:lockpick:canStart', doorHash)
-  local authorized = Citizen.Await(p)
-  if not authorized then
+  local ok, authorized = exports['feather-core']:CallRPCAsync('bcc-banks:lockpick:canStart', { doorHash = doorHash })
+  if not (ok and authorized) then
     if lockpickCfg.RequireItem then
-      Notify(_U('lockpick_need_item'), 'error', 2500)
+      Notify(Feather.Locale.translateUpper('lockpick_need_item'), 'error', 2500)
     end
     return
   end
@@ -130,29 +122,29 @@ local function tryLockpickDoor(doorHash)
   local res = lockpickCfg.Resource or 'lockpick'
   if GetResourceState(res) ~= 'started' then
     if lockpickCfg.NotifyOnMissing then
-      Notify(_U('lockpick_resource_missing', res), 'error', 4000)
+      Notify(Feather.Locale.translateUpper('lockpick_resource_missing', res), 'error', 4000)
     end
     return
   end
 
   local attempts = tonumber(lockpickCfg.Attempts or 3) or 3
-  local ok = false
+  local success = false
   pcall(function()
-    ok = exports[res]:startLockpick(attempts)
+    success = exports[res]:startLockpick(attempts)
   end)
 
-  if ok then
-    TriggerServerEvent('feather-banks:lockpick:onSuccess', doorHash)
+  if success then
+    exports['feather-core']:CallRPCAsync('bcc-banks:lockpick:onSuccess', { doorHash = doorHash })
   else
-    Notify(_U('lockpick_failed'), 'error', 2500)
+    Notify(Feather.Locale.translateUpper('lockpick_failed'), 'error', 2500)
     DoorSystemSetDoorState(doorHash, 1) -- ensure door stays locked so prompt appears again
     DoorSystemSetOpenRatio(doorHash, 0.0, true)
     -- signal server to handle durability / consume item
-    TriggerServerEvent('feather-banks:lockpick:onFail')
+    exports['feather-core']:CallRPCAsync('bcc-banks:lockpick:onFail', {})
   end
 end
 
-RegisterNetEvent('feather-banks:lockpick:setDoorState', function(doorHash, state, actorSrc, reason)
+RegisterNetEvent('bcc-banks:lockpick:setDoorState', function(doorHash, state, actorSrc, reason)
   doorHash = tonumber(doorHash)
   if not doorHash or Config.Doors[doorHash] == nil then return end
   ensureDoorRegistered(doorHash)
@@ -162,7 +154,7 @@ RegisterNetEvent('feather-banks:lockpick:setDoorState', function(doorHash, state
   if state == 0 and reason == 'bypass' then
     Notify(textOrFallback('door_unlocked', 'Door unlocked'), 'success', 3000)
   elseif state == 0 then
-    Notify(_U('lockpick_success'), 'success', 3000)
+    Notify(Feather.Locale.translateUpper('lockpick_success'), 'success', 3000)
   elseif state == 1 then
     Notify(textOrFallback('door_locked', 'Door locked.'), 'success', 3000)
   end
@@ -186,7 +178,7 @@ CreateThread(function()
   end
   local promptKey = lockpickCfg.PromptKey or 0xCEFD9220
   local openPrompt = createDoorPrompt(textOrFallback('door_open_prompt', 'Open Door'), promptKey, openGroup)
-  local lockpickPrompt = createDoorPrompt(_U('lockpick_door_prompt'), promptKey, lockpickGroup)
+  local lockpickPrompt = createDoorPrompt(Feather.Locale.translateUpper('lockpick_door_prompt'), promptKey, lockpickGroup)
   local lockPrompt = createDoorPrompt(textOrFallback('door_lock_prompt', 'Lock Door'), lockpickCfg.LockPromptKey or promptKey, lockGroup)
 
   while true do

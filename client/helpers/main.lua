@@ -47,7 +47,7 @@ function Notify(message, typeOrDuration, maybeDuration)
     end
 end
 
-exports['feather-core']:RegisterRPC("feather-banks:NotifyClient", function(data)
+exports['feather-core']:RegisterRPC("bcc-banks:NotifyClient", function(data)
     Notify(data.message, data.type, data.duration)
 end)
 

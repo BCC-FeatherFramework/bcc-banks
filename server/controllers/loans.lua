@@ -100,7 +100,7 @@ function RepayLoan(loan_id, account_id, character_id, amount)
     end
 
     -- Record the repayment against the loan
-    local repayDesc = _U and _U('loan_repayment_account_desc') or 'Loan repayment from account'
+    local repayDesc = _U and Feather.Locale.translateUpper('loan_repayment_account_desc') or 'Loan repayment from account'
     AddLoanTransaction(loan_id, character_id, amount, 'loan - repayment', repayDesc)
 
     -- Mark loan paid if fully repaid
@@ -156,7 +156,7 @@ function ApproveLoan(loan_id, approver_char_id)
             )
             return { status = false, message = 'Failed to disburse funds to account.' }
         end
-        local disburseDesc = _U and _U('loan_disbursement_desc') or 'Loan disbursed to account'
+        local disburseDesc = _U and Feather.Locale.translateUpper('loan_disbursement_desc') or 'Loan disbursed to account'
         AddLoanTransaction(loan.id, loan.character_id, amt, 'loan - disbursement', disburseDesc)
         MySQL.query.await('UPDATE `bcc_loans` SET `disbursed_account_id` = ?, `disbursed_at` = NOW() WHERE `id` = ?', { loan.account_id, loan.id })
     else
@@ -209,7 +209,7 @@ function ClaimLoanToAccount(loan_id, account_id, character_id)
         )
         return { status = false, message = 'Unable to deposit into the selected account.' }
     end
-        local claimDesc = _U and _U('loan_claim_transaction_desc') or 'Loan disbursed to account (claimed)'
+        local claimDesc = _U and Feather.Locale.translateUpper('loan_claim_transaction_desc') or 'Loan disbursed to account (claimed)'
         AddLoanTransaction(loan.id, loan.character_id, amt, 'loan - disbursement', claimDesc)
     local updated = GetLoan(loan_id)
     return { status = true, loan = updated }

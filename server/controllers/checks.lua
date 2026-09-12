@@ -68,9 +68,9 @@ end
 -- ─────────────────────────────────────────────────────────────
 --  Write a check
 -- ─────────────────────────────────────────────────────────────
-exports['feather-core']:RegisterRPC('Feather:Banks:WriteCheck', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:WriteCheck', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -81,7 +81,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WriteCheck', function(params,
     local memo      = tostring((params and params.memo) or '')
 
     if not accountId or not IsFinitePositiveNumber(amount) or firstName == '' or lastName == '' then
-        NotifyClient(src, _U('invalid_check_recipient'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('invalid_check_recipient'), 'error', 4000)
         cb(false)
         return
     end
@@ -93,20 +93,20 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WriteCheck', function(params,
 
     local access = GetAccountAccess(accountId, charId)
     if access == 0 or access > Config.AccessLevels.Withdraw_Deposit then
-        NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
         cb(false)
         return
     end
 
     local recipientCharId = GetCharacterByName(firstName, lastName)
     if not recipientCharId then
-        NotifyClient(src, _U('invalid_check_recipient'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('invalid_check_recipient'), 'error', 4000)
         cb(false)
         return
     end
 
     if IdsEqual(charId, recipientCharId) then
-        NotifyClient(src, _U('error_invalid_check'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_check'), 'error', 4000)
         cb(false)
         return
     end
@@ -117,7 +117,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WriteCheck', function(params,
         local key = result.message and result.message:find('Insufficient')
             and 'error_insufficient_funds_check'
             or  'error_unable_write_check'
-        NotifyClient(src, _U(key), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper(key), 'error', 4000)
         cb(false)
         return
     end
@@ -136,13 +136,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WriteCheck', function(params,
             MySQL.update.await('UPDATE `bcc_checks` SET `status` = "voided" WHERE `id` = ? AND `status` = "pending"',
                 { result.check_id })
             DepositCash(accountId, amount)
-            NotifyClient(src, _U('error_unable_write_check'), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_unable_write_check'), 'error', 4000)
             cb(false)
             return
         end
     end
 
-    NotifyClient(src, _U('check_written_notify', tostring(amount)), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('check_written_notify', tostring(amount)), 'success', 4000)
     local accountRow = BccBanksInternal.getAccountSummary(accountId)
     local lines = {
         '**Action:** `Check Written`',
@@ -168,7 +168,7 @@ end)
 --  DB-only mode : query bcc_checks by recipient_character_id
 --  Item mode    : scan inventory, validate each check_id in DB
 -- ─────────────────────────────────────────────────────────────
-exports['feather-core']:RegisterRPC('Feather:Banks:GetMyChecks', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetMyChecks', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then cb(false, {}) return end
     local user = GetBankingContext(src)
     if not user then cb(false, {}) return end
@@ -205,7 +205,7 @@ end)
 -- ─────────────────────────────────────────────────────────────
 --  Get pending checks issued from an account (for voiding)
 -- ─────────────────────────────────────────────────────────────
-exports['feather-core']:RegisterRPC('Feather:Banks:GetIssuedChecks', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetIssuedChecks', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then cb(false, {}) return end
     local accountId = NormalizeId(params and params.account)
     if not accountId then cb(false, {}) return end
@@ -225,16 +225,16 @@ end)
 -- ─────────────────────────────────────────────────────────────
 --  Cash a check
 -- ─────────────────────────────────────────────────────────────
-exports['feather-core']:RegisterRPC('Feather:Banks:CashCheck', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:CashCheck', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
 
     local checkId = params and params.check_id
     if not checkId then
-        NotifyClient(src, _U('error_invalid_check'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_check'), 'error', 4000)
         cb(false)
         return
     end
@@ -242,7 +242,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CashCheck', function(params, 
     local check = GetCheck(checkId)
     local sourceAccount = check and GetAccount(check.account_id)
     if not sourceAccount or not IsPlayerNearBank(src, sourceAccount.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -263,14 +263,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CashCheck', function(params, 
             end
         end
         if not foundItemId then
-            NotifyClient(src, _U('error_invalid_check'), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_invalid_check'), 'error', 4000)
             cb(false)
             return
         end
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
@@ -284,7 +284,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CashCheck', function(params, 
             not_yours      = 'error_check_not_yours',
         }
         local key = keyMap[result.message] or 'error_invalid_check'
-        NotifyClient(src, _U(key), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper(key), 'error', 4000)
         cb(false)
         return
     end
@@ -302,7 +302,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CashCheck', function(params, 
     AddAccountTransaction(result.account_id or (check and check.account_id), charId, result.amount, 'check - cashed', 'Check cashed by character #' .. tostring(charId))
     ReleasePlayerFinancialLock(src)
 
-    NotifyClient(src, _U('check_cashed_notify', tostring(result.amount)), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('check_cashed_notify', tostring(result.amount)), 'success', 4000)
     local issuerFirst, issuerLast = GetCharacterName(check.issuer_character_id)
     local accountRow = BccBanksInternal.getAccountSummary(check.account_id)
     local lines = {
@@ -324,15 +324,15 @@ end)
 -- ─────────────────────────────────────────────────────────────
 --  Void a check (issuer or account admin, refunds account)
 -- ─────────────────────────────────────────────────────────────
-exports['feather-core']:RegisterRPC('Feather:Banks:VoidCheck', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:VoidCheck', function(params, cb, src)
     if not (Config.Checks and Config.Checks.Enabled == true) or not IsPlayerNearBank(src) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
     local checkId = params and params.check_id
     if not checkId then
-        NotifyClient(src, _U('error_invalid_check'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_check'), 'error', 4000)
         cb(false)
         return
     end
@@ -348,12 +348,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:VoidCheck', function(params, 
         local key = result.message == 'no_permission'
             and 'error_check_no_permission_void'
             or  'error_invalid_check'
-        NotifyClient(src, _U(key), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper(key), 'error', 4000)
         cb(false)
         return
     end
 
-    NotifyClient(src, _U('check_voided_notify'), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('check_voided_notify'), 'success', 4000)
     local check = GetCheck(checkId)
     local accountRow = check and BccBanksInternal.getAccountSummary(check.account_id) or nil
     local recipientName = check and BccBanksInternal.getCharacterNameById(check.recipient_character_id) or 'Unknown'
@@ -377,7 +377,7 @@ end)
 --  Double-clicking the bank_check item cashes it directly.
 --  Proximity to a bank is enforced server-side.
 -- ─────────────────────────────────────────────────────────────
-AddEventHandler('Feather:Banks:DatabaseReady', function(checkItemReady)
+AddEventHandler('bcc-banks:DatabaseReady', function(checkItemReady)
 if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useItem() then
     exports['feather-inventory'].initiate().Items.RegisterUsableItem(checkItemName(), function(itemObj, src, refresh)
 
@@ -397,13 +397,13 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
     local checkId = meta.check_id
 
     if not checkId then
-        NotifyClient(src, _U('error_invalid_check'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_check'), 'error', 4000)
         return
     end
 
     -- Must be near a bank
     if not IsPlayerNearBank(src) then
-        NotifyClient(src, _U('error_check_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_check_not_at_bank'), 'error', 4000)
         return
     end
 
@@ -413,7 +413,7 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
     local charId = NormalizeId(char.characterId)
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         return
     end
     local result = CashCheck(checkId, charId)
@@ -426,7 +426,7 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
             not_yours      = 'error_check_not_yours',
         }
         local key = keyMap[result.message] or 'error_invalid_check'
-        NotifyClient(src, _U(key), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper(key), 'error', 4000)
         return
     end
 
@@ -445,7 +445,7 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
         refresh()
     end
     ReleasePlayerFinancialLock(src)
-    NotifyClient(src, _U('check_cashed_notify', tostring(result.amount)), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('check_cashed_notify', tostring(result.amount)), 'success', 4000)
     local check = GetCheck(checkId)
     AddAccountTransaction(result.account_id or (check and check.account_id), charId, result.amount, 'check - cashed', 'Check cashed by character #' .. tostring(charId))
     local issuerFirst, issuerLast = nil, nil

@@ -1,5 +1,5 @@
 function OpenAccountDetails(account, AccountPage)
-    local ok, resp = exports['feather-core']:CallRPCAsync("Feather:Banks:GetAccount", {
+    local ok, resp = exports['feather-core']:CallRPCAsync("bcc-banks:GetAccount", {
         account     = tostring(account.id),
         lockAccount = true
     })
@@ -10,12 +10,12 @@ function OpenAccountDetails(account, AccountPage)
     local AccountPageDetails = FeatherBankMenu:RegisterPage("account:page:details:" .. acc.id)
 
     AccountPageDetails:RegisterElement("header", {
-        value = _U("account_details_header"),
+        value = Feather.Locale.translateUpper("account_details_header"),
         slot  = "header"
     })
 
     AccountPageDetails:RegisterElement("subheader", {
-        value = _U("account_details_subheader"),
+        value = Feather.Locale.translateUpper("account_details_subheader"),
         slot  = "header"
     })
 
@@ -33,7 +33,7 @@ function OpenAccountDetails(account, AccountPage)
                 data  = {
                     img      = "nui://bcc-banks/ui/images/money_moneystack.png",
                     label    = "$" .. acc.cash,
-                    tooltip  = _U("cash_balance_tooltip"),
+                    tooltip  = Feather.Locale.translateUpper("cash_balance_tooltip"),
                     style    = { margin = "6px" },
                     disabled = false
                 }
@@ -44,7 +44,7 @@ function OpenAccountDetails(account, AccountPage)
                 data  = {
                     img      = "nui://bcc-banks/ui/images/provision_goldbar_small.png",
                     label    = tostring(acc.gold) .. " g",
-                    tooltip  = _U("gold_balance_tooltip"),
+                    tooltip  = Feather.Locale.translateUpper("gold_balance_tooltip"),
                     style    = { margin = "6px" },
                     disabled = false
                 }
@@ -58,35 +58,35 @@ function OpenAccountDetails(account, AccountPage)
     })
 
     AccountPageDetails:RegisterElement("button", {
-        label = _U("deposit_button"),
+        label = Feather.Locale.translateUpper("deposit_button"),
         style = {}
     }, function()
         OpenWithdrawDepositPage(acc, "deposit", AccountPage)
     end)
 
     AccountPageDetails:RegisterElement("button", {
-        label = _U("withdraw_button"),
+        label = Feather.Locale.translateUpper("withdraw_button"),
         style = {}
     }, function()
         OpenWithdrawDepositPage(acc, "withdraw", AccountPage)
     end)
 
     AccountPageDetails:RegisterElement("button", {
-        label = _U("transfer_button"),
+        label = Feather.Locale.translateUpper("transfer_button"),
         style = {}
     }, function()
         OpenTransferSelectBank(acc, AccountPage)
     end)
 
     AccountPageDetails:RegisterElement("button", {
-        label = _U("view_transactions_button"),
+        label = Feather.Locale.translateUpper("view_transactions_button"),
         style = {}
     }, function()
         OpenTransactionsPage(acc, AccountPage)
     end)
 
     AccountPageDetails:RegisterElement("button", {
-        label = _U("manage_access_button"),
+        label = Feather.Locale.translateUpper("manage_access_button"),
         slot  = "content"
     }, function()
         OpenAccessMenu(account, AccountPage)
@@ -94,14 +94,14 @@ function OpenAccountDetails(account, AccountPage)
 
     if Config.Checks and Config.Checks.Enabled then
         AccountPageDetails:RegisterElement("button", {
-            label = _U("write_check_button"),
+            label = Feather.Locale.translateUpper("write_check_button"),
             style = {}
         }, function()
             OpenWriteCheckPage(acc, AccountPageDetails)
         end)
 
         AccountPageDetails:RegisterElement("button", {
-            label = _U("view_issued_checks_button"),
+            label = Feather.Locale.translateUpper("view_issued_checks_button"),
             style = {}
         }, function()
             OpenIssuedChecksPage(acc, AccountPageDetails)
@@ -114,7 +114,7 @@ function OpenAccountDetails(account, AccountPage)
     })
 
     AccountPageDetails:RegisterElement("button", {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -130,8 +130,8 @@ function OpenAccountDetails(account, AccountPage)
 
     local html = [[
         <div style="padding:30px; text-align:left;">
-            <div><b>]] .. _U("account_number_label") .. [[</b> ]] .. acc.account_number .. [[</div>
-            <div><b>]] .. _U("account_name_label") .. [[</b> ]] .. acc.name .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper("account_number_label") .. [[</b> ]] .. acc.account_number .. [[</div>
+            <div><b>]] .. Feather.Locale.translateUpper("account_name_label") .. [[</b> ]] .. acc.name .. [[</div>
         </div>
     ]]
 
@@ -147,11 +147,11 @@ function OpenTransferPage(account, ParentPage)
     local TransferPage = FeatherBankMenu:RegisterPage('account:page:transfer:' .. tostring(account.id))
 
     TransferPage:RegisterElement('header', {
-        value = _U('transfer_header'),
+        value = Feather.Locale.translateUpper('transfer_header'),
         slot  = 'header'
     })
     TransferPage:RegisterElement('subheader', {
-        value = _U('transaction_title'),
+        value = Feather.Locale.translateUpper('transaction_title'),
         slot  = 'header'
     })
     TransferPage:RegisterElement('line', {
@@ -162,24 +162,24 @@ function OpenTransferPage(account, ParentPage)
     local destNumber, amountValue, descValue = '', '', ''
 
     TransferPage:RegisterElement('input', {
-        label = _U('destination_account_label'),
-        placeholder = _U('destination_account_placeholder'),
+        label = Feather.Locale.translateUpper('destination_account_label'),
+        placeholder = Feather.Locale.translateUpper('destination_account_placeholder'),
         style = {}
     }, function(data)
         destNumber = data.value
     end)
 
     TransferPage:RegisterElement('input', {
-        label = _U('transfer_amount_label'),
-        placeholder = _U('cash_amount_placeholder'),
+        label = Feather.Locale.translateUpper('transfer_amount_label'),
+        placeholder = Feather.Locale.translateUpper('cash_amount_placeholder'),
         style = {}
     }, function(data)
         amountValue = data.value
     end)
 
     TransferPage:RegisterElement('input', {
-        label = _U('transfer_description_label'),
-        placeholder = _U('transaction_title'),
+        label = Feather.Locale.translateUpper('transfer_description_label'),
+        placeholder = Feather.Locale.translateUpper('transaction_title'),
         style = {}
     }, function(data)
         descValue = data.value
@@ -188,27 +188,27 @@ function OpenTransferPage(account, ParentPage)
     -- Optional helper text
     local feePercent = (Config and Config.Transfer and Config.Transfer.CrossBankFeePercent) or 0.0
     TransferPage:RegisterElement('textdisplay', {
-        value = _U('transfer_fee_note', tostring(feePercent)),
+        value = Feather.Locale.translateUpper('transfer_fee_note', tostring(feePercent)),
         slot = 'content'
     })
 
     TransferPage:RegisterElement('button', {
-        label = _U('transfer_confirm_button'),
+        label = Feather.Locale.translateUpper('transfer_confirm_button'),
         style = {}
     }, function()
         local amt = tonumber(amountValue)
         if not amt or amt <= 0 then
-            Notify(_U('invalid_cash_amount'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_cash_amount'), 4000)
             return
         end
-        local ok, resp = exports['feather-core']:CallRPCAsync('Feather:Banks:TransferCash', {
+        local ok, resp = exports['feather-core']:CallRPCAsync('bcc-banks:TransferCash', {
             fromAccount = account.id,
             toAccountNumber = destNumber,
             amount = amt,
             description = descValue
         })
         if ok then
-            Notify(_U('success_transfer', tostring(amt)), 4000)
+            Notify(Feather.Locale.translateUpper('success_transfer', tostring(amt)), 4000)
             -- Refresh details
             OpenAccountDetails(account, ParentPage)
         end
@@ -216,7 +216,7 @@ function OpenTransferPage(account, ParentPage)
 
     TransferPage:RegisterElement('line', { slot = 'footer', style = {} })
     TransferPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -230,11 +230,11 @@ end
 function OpenTransferSelectBank(account, ParentPage)
     local SelectBankTransferPage = FeatherBankMenu:RegisterPage('account:page:transfer:selectbank:' .. tostring(account.id))
     SelectBankTransferPage:RegisterElement('header', {
-        value = _U('transfer_header'),
+        value = Feather.Locale.translateUpper('transfer_header'),
         slot  = 'header'
     })
     SelectBankTransferPage:RegisterElement('subheader', {
-        value = _U('bank_accounts_header'),
+        value = Feather.Locale.translateUpper('bank_accounts_header'),
         slot  = 'header'
     })
     SelectBankTransferPage:RegisterElement('line', {
@@ -242,7 +242,7 @@ function OpenTransferSelectBank(account, ParentPage)
         style = {}
     })
 
-    local ok, banks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetBanks', {})
+    local ok, banks = exports['feather-core']:CallRPCAsync('bcc-banks:GetBanks', {})
     -- Normalize return shape: some RPCs return (data) instead of (ok, data)
     if type(ok) == 'table' and banks == nil then
         banks = ok
@@ -251,7 +251,7 @@ function OpenTransferSelectBank(account, ParentPage)
     devPrint('Transfer SelectBank: ok=', ok, 'banks_count=', (banks and #banks) or 0)
     if not ok or not banks or #banks == 0 then
         SelectBankTransferPage:RegisterElement('textdisplay', {
-            value = _U('no_accounts_found'),
+            value = Feather.Locale.translateUpper('no_accounts_found'),
             slot  = 'content'
         })
     else
@@ -270,7 +270,7 @@ function OpenTransferSelectBank(account, ParentPage)
         style = {}
     })
     SelectBankTransferPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -290,7 +290,7 @@ function OpenTransferSelectAccount(account, bank, ParentPage)
         slot  = 'header'
     })
     SelectAccountTransferPage:RegisterElement('subheader', {
-        value = _U('select_account_header'),
+        value = Feather.Locale.translateUpper('select_account_header'),
         slot  = 'header'
     })
     SelectAccountTransferPage:RegisterElement('line', {
@@ -299,11 +299,11 @@ function OpenTransferSelectAccount(account, bank, ParentPage)
     })
 
     -- List only YOUR accounts at the selected bank
-    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('bcc-banks:GetAccounts', { bank = bank.id })
     devPrint('Transfer SelectAccount (mine-only): bank=', bank.id, 'ok=', ok, 'accounts_count=', accounts and #accounts or 0)
     if not ok or not accounts or #accounts == 0 then
         SelectAccountTransferPage:RegisterElement('textdisplay', {
-            value = _U('no_accounts_found'),
+            value = Feather.Locale.translateUpper('no_accounts_found'),
             slot  = 'content'
         })
     else
@@ -321,7 +321,7 @@ function OpenTransferSelectAccount(account, bank, ParentPage)
     -- Optional path: enter a destination account number manually
     SelectAccountTransferPage:RegisterElement('line', { slot = 'content', style = {} })
     SelectAccountTransferPage:RegisterElement('button', {
-        label = _U('transfer_enter_number_button'),
+        label = Feather.Locale.translateUpper('transfer_enter_number_button'),
         style = {}
     }, function()
         OpenTransferPage(account, SelectAccountTransferPage)
@@ -329,7 +329,7 @@ function OpenTransferSelectAccount(account, bank, ParentPage)
 
     SelectAccountTransferPage:RegisterElement('line', { slot = 'footer', style = {} })
     SelectAccountTransferPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -342,7 +342,7 @@ end
 function OpenTransferForm(fromAccount, toAccount, ParentPage)
     local TransferFormPage = FeatherBankMenu:RegisterPage('account:page:transfer:form:' .. tostring(fromAccount.id) .. ':' .. tostring(toAccount.id))
     TransferFormPage:RegisterElement('header', {
-        value = _U('transfer_header'),
+        value = Feather.Locale.translateUpper('transfer_header'),
         slot  = 'header'
     })
     local accnum = tostring(toAccount.account_number or '')
@@ -362,41 +362,41 @@ function OpenTransferForm(fromAccount, toAccount, ParentPage)
 
     local amountValue, descValue = '', ''
 
-    TransferFormPage:RegisterElement('input', { label = _U('transfer_amount_label'), placeholder = _U('cash_amount_placeholder'), style = {} }, function(data)
+    TransferFormPage:RegisterElement('input', { label = Feather.Locale.translateUpper('transfer_amount_label'), placeholder = Feather.Locale.translateUpper('cash_amount_placeholder'), style = {} }, function(data)
         amountValue = data.value
     end)
 
-    TransferFormPage:RegisterElement('input', { label = _U('transfer_description_label'), placeholder = _U('transaction_title'), style = {} }, function(data)
+    TransferFormPage:RegisterElement('input', { label = Feather.Locale.translateUpper('transfer_description_label'), placeholder = Feather.Locale.translateUpper('transaction_title'), style = {} }, function(data)
         descValue = data.value
     end)
 
     local feePercent = (Config and Config.Transfer and Config.Transfer.CrossBankFeePercent) or 0.0
-    TransferFormPage:RegisterElement('textdisplay', { value = _U('transfer_fee_note', tostring(feePercent)), slot = 'content' })
+    TransferFormPage:RegisterElement('textdisplay', { value = Feather.Locale.translateUpper('transfer_fee_note', tostring(feePercent)), slot = 'content' })
 
     TransferFormPage:RegisterElement('button', {
-        label = _U('transfer_confirm_button'),
+        label = Feather.Locale.translateUpper('transfer_confirm_button'),
         style = {}
     }, function()
         local amt = tonumber(amountValue)
         if not amt or amt <= 0 then
-            Notify(_U('invalid_cash_amount'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_cash_amount'), 4000)
             return
         end
-        local ok, resp = exports['feather-core']:CallRPCAsync('Feather:Banks:TransferCash', {
+        local ok, resp = exports['feather-core']:CallRPCAsync('bcc-banks:TransferCash', {
             fromAccount = fromAccount.id,
             toAccountId = toAccount.id,
             amount = amt,
             description = descValue
         })
         if ok then
-            Notify(_U('success_transfer', tostring(amt)), 4000)
+            Notify(Feather.Locale.translateUpper('success_transfer', tostring(amt)), 4000)
             OpenAccountDetails(fromAccount, ParentPage)
         end
     end)
 
     TransferFormPage:RegisterElement('line', { slot = 'footer', style = {} })
     TransferFormPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -410,13 +410,13 @@ function OpenCreateAccountPage(bank, AccountPage)
     local CreateAccountPage = FeatherBankMenu:RegisterPage('create:account:page')
 
     CreateAccountPage:RegisterElement('header', {
-        value = _U("create_account_header"),
+        value = Feather.Locale.translateUpper("create_account_header"),
         slot = "header"
     })
 
     CreateAccountPage:RegisterElement('input', {
-        label       = _U("account_name_label"),
-        placeholder = _U("account_name_placeholder"),
+        label       = Feather.Locale.translateUpper("account_name_label"),
+        placeholder = Feather.Locale.translateUpper("account_name_placeholder"),
         style       = {}
     }, function(data)
         CreateAccountPage.accountName = data.value
@@ -428,7 +428,7 @@ function OpenCreateAccountPage(bank, AccountPage)
     })
 
     CreateAccountPage:RegisterElement('button', {
-        label = _U("confirm_button"),
+        label = Feather.Locale.translateUpper("confirm_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -439,16 +439,16 @@ function OpenCreateAccountPage(bank, AccountPage)
             }
 
             devPrint("Sending data to server:", json.encode(data))
-            exports['feather-core']:CallRPCAsync('Feather:Banks:CreateAccount', data)
+            exports['feather-core']:CallRPCAsync('bcc-banks:CreateAccount', data)
 
             OpenUI(bank)
         else
-            Notify(_U("invalid_account_name"), 4000)
+            Notify(Feather.Locale.translateUpper("invalid_account_name"), 4000)
         end
     end)
 
     CreateAccountPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -467,12 +467,12 @@ function OpenAccountsListPage(bank, ParentPage)
     local AccountsListPage = FeatherBankMenu:RegisterPage('bank:page:accounts:' .. tostring(bank.id))
 
     AccountsListPage:RegisterElement('header', {
-        value = _U("bank_accounts_header"),
+        value = Feather.Locale.translateUpper("bank_accounts_header"),
         slot  = "header"
     })
 
     AccountsListPage:RegisterElement('subheader', {
-        value = _U("bank_accounts_subheader"),
+        value = Feather.Locale.translateUpper("bank_accounts_subheader"),
         slot  = "header"
     })
 
@@ -481,13 +481,13 @@ function OpenAccountsListPage(bank, ParentPage)
         style = {}
     })
 
-    local ok, accounts = exports['feather-core']:CallRPCAsync('Feather:Banks:GetAccounts', { bank = bank.id })
+    local ok, accounts = exports['feather-core']:CallRPCAsync('bcc-banks:GetAccounts', { bank = bank.id })
 
     devPrint("Accounts fetched from server:", json.encode(accounts))
 
     if not ok or not accounts or #accounts == 0 then
         AccountsListPage:RegisterElement('textdisplay', {
-            value = _U("no_accounts_found"),
+            value = Feather.Locale.translateUpper("no_accounts_found"),
             slot  = "content"
         })
     else
@@ -507,7 +507,7 @@ function OpenAccountsListPage(bank, ParentPage)
     })
 
     AccountsListPage:RegisterElement('button', {
-        label = _U("create_account_button"),
+        label = Feather.Locale.translateUpper("create_account_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -515,7 +515,7 @@ function OpenAccountsListPage(bank, ParentPage)
     end)
 
     AccountsListPage:RegisterElement('button', {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()

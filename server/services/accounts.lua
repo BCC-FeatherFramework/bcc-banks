@@ -9,20 +9,20 @@ local function isNearAccountBank(src, accountId)
     return account and IsPlayerNearBank(src, account.bank_id)
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetAccounts', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetAccounts', function(params, cb, src)
     devPrint("GetAccounts RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("GetAccounts: Character not found (no user).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint("GetAccounts: Character not found (no used character).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
@@ -33,27 +33,27 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccounts', function(params
 
     if not characterId then
         devPrint("GetAccounts: Character ID is nil.")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
 
     if not bankId then
         devPrint("GetAccounts: Bank ID is nil.")
-        NotifyClient(src, _U('error_invalid_bank'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_bank'), "error", 4000)
         cb(false)
         return
     end
 
     if not IsPlayerNearBank(src, bankId) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
 
     if type(GetAccounts) ~= 'function' then
         devPrint("GetAccounts is not available (nil). Ensure controllers are loaded before services.")
-        NotifyClient(src, _U('error_db'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_db'), 'error', 4000)
         cb(false)
         return
     end
@@ -62,8 +62,8 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccounts', function(params
 
     if not ok then
         devPrint("GetAccounts query failed:", result)
-        NotifyClient(src, _U('error_fetch_accounts'), "error", 4000)
-        NotifyClient(src, _U('error_db'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_fetch_accounts'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_db'), 'error', 4000)
         cb(false)
         return
     end
@@ -73,7 +73,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccounts', function(params
 end)
 
 -- Public: list all accounts for a bank (minimal fields)
-exports['feather-core']:RegisterRPC('Feather:Banks:ListAccountsByBank', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:ListAccountsByBank', function(params, cb, src)
     local bankId = NormalizeId(params and params.bank)
     devPrint('ListAccountsByBank RPC called. src=', src, 'bank=', bankId)
     if not bankId then
@@ -99,20 +99,20 @@ exports['feather-core']:RegisterRPC('Feather:Banks:ListAccountsByBank', function
     cb(true, rows or {})
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:CreateAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:CreateAccount', function(params, cb, src)
     devPrint("CreateAccount RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("CreateAccount: Character not found (no user).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint("CreateAccount: Character not found (no used character).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
@@ -125,20 +125,20 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateAccount', function(para
 
     if not characterId then
         devPrint("CreateAccount: Character not found or ID is nil.")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
         cb(false)
         return
     end
 
     if not name or name == "" or not bank then
         devPrint("CreateAccount: Missing name or bank.")
-        NotifyClient(src, _U('error_invalid_account_data'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_data'), "error", 4000)
         cb(false)
         return
     end
 
     if not IsPlayerNearBank(src, bank) then
-        NotifyClient(src, _U('error_not_at_bank'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), "error", 4000)
         cb(false)
         return
     end
@@ -151,13 +151,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateAccount', function(para
 
     if not ok then
         devPrint("CreateAccount failed:", out)
-        NotifyClient(src, _U('error_unable_create_account'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_account'), "error", 4000)
         cb(false)
         return
     end
 
     if type(out) == 'table' and out.status == false then
-        NotifyClient(src, out.message or _U('error_unable_create_account'), "error", 4000)
+        NotifyClient(src, out.message or Feather.Locale.translateUpper('error_unable_create_account'), "error", 4000)
         cb(false)
         return
     end
@@ -174,26 +174,26 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CreateAccount', function(para
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Account Created', lines, 5763719)
-    NotifyClient(src, _U('success_account_created'), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_account_created'), "success", 4000)
     cb(true, out)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:CloseAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:CloseAccount', function(params, cb, src)
     devPrint("CloseAccount RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("CloseAccount: Character not found (no user).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint("CloseAccount: Character not found (no used character).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
@@ -205,14 +205,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CloseAccount', function(param
 
     if not characterId or not bank or not account then
         devPrint("CloseAccount: Invalid inputs.")
-        NotifyClient(src, _U('error_invalid_data'), "error", 4000)
-        NotifyClient(src, _U('error_invalid_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
 
     if not IsPlayerNearBank(src, bank) then
-        NotifyClient(src, _U('error_not_at_bank'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), "error", 4000)
         cb(false)
         return
     end
@@ -223,14 +223,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CloseAccount', function(param
 
     if not ok then
         devPrint("CloseAccount failed:", out)
-        NotifyClient(src, _U('error_unable_close_account'), "error", 4000)
-        NotifyClient(src, _U('error_db'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_close_account'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_db'), 'error', 4000)
         cb(false)
         return
     end
 
     if type(out) == 'table' and out.status == false then
-        NotifyClient(src, out.message or _U('error_unable_close_account'), "error", 4000)
+        NotifyClient(src, out.message or Feather.Locale.translateUpper('error_unable_close_account'), "error", 4000)
         cb(false)
         return
     end
@@ -244,26 +244,26 @@ exports['feather-core']:RegisterRPC('Feather:Banks:CloseAccount', function(param
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Account Closed', lines, 15158332)
-    NotifyClient(src, _U('success_account_closed'), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_account_closed'), "success", 4000)
     cb(true, out)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetAccount', function(params, cb, src)
     devPrint("GetAccount RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("GetAccount: Character not found (no user).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     local char = user
     if not char then
         devPrint("GetAccount: Character not found (no used character).")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
@@ -275,23 +275,23 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccount', function(params,
 
     if not characterId then
         devPrint("GetAccount: Character not found.")
-        NotifyClient(src, _U('error_character_not_found'), "error", 4000)
-        NotifyClient(src, _U('error_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
     if not accId then
         devPrint("GetAccount: Invalid account id.")
-        NotifyClient(src, _U('error_invalid_account'), "error", 4000)
-        NotifyClient(src, _U('error_invalid_account_id'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id'), 'error', 4000)
         cb(false)
         return
     end
 
     if not HasAccountAccess(accId, characterId) and not IsAccountOwner(accId, characterId) then
         devPrint("GetAccount: HasAccountAccess=false for characterId=", characterId, "accId=", accId)
-        NotifyClient(src, _U('error_insufficient_access'), "error", 4000)
-        NotifyClient(src, _U('error_insufficient_access'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
         cb(false)
         return
     end
@@ -304,8 +304,8 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccount', function(params,
             SetLockedAccount(accId, lockHolder, false)
         else
             devPrint("GetAccount: Account locked and not active user. accId=", accId)
-            NotifyClient(src, _U('error_account_locked'), "error", 4000)
-            NotifyClient(src, _U('error_account_locked'), 'error', 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_account_locked'), "error", 4000)
+            NotifyClient(src, Feather.Locale.translateUpper('error_account_locked'), 'error', 4000)
             cb(false)
             return
         end
@@ -322,8 +322,8 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccount', function(params,
 
     if not ok then
         devPrint("GetAccount: DB error:", accountData)
-        NotifyClient(src, _U('error_failed_load_account'), "error", 4000)
-        NotifyClient(src, _U('error_db'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_failed_load_account'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_db'), 'error', 4000)
         cb(false)
         return
     end
@@ -332,19 +332,19 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccount', function(params,
     cb(true, { account = accountData, transactions = txData or {} })
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:UnlockAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:UnlockAccount', function(params, cb, src)
     devPrint("UnlockAccount RPC called. src=", src, "params=", params)
 
     local accId = NormalizeId(params and params.account)
     if not accId then
         devPrint("UnlockAccount: invalid account id.")
-        NotifyClient(src, _U('error_invalid_account_id'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id'), 'error', 4000)
         cb(false)
         return
     end
     if not IsActiveUser(accId, src) then
         devPrint("UnlockAccount: src is not active user for accId=", accId)
-        NotifyClient(src, _U('error_not_active_user'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_active_user'), 'error', 4000)
         cb(false)
         return
     end
@@ -354,7 +354,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:UnlockAccount', function(para
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GetAccountAccessList', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GetAccountAccessList', function(params, cb, src)
     devPrint("GetAccountAccessList RPC called. src=", src, "params=", params)
 
     local account = NormalizeId(params and params.account)
@@ -362,8 +362,8 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccountAccessList', functi
 
     if not account then
         devPrint("GetAccountAccessList: Invalid account ID.")
-        NotifyClient(src, _U('error_invalid_account_id'), "error", 4000)
-        NotifyClient(src, _U('error_invalid_account_id'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id'), 'error', 4000)
         cb(false)
         return
     end
@@ -372,12 +372,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccountAccessList', functi
     local char = user
     local requesterId = char and char.characterId
     if not requesterId or not (IsAccountOwner(account, requesterId) or IsAccountAdmin(account, requesterId)) then
-        NotifyClient(src, _U('error_no_permission'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), 'error', 4000)
         cb(false)
         return
     end
     if not isNearAccountBank(src, account) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -407,13 +407,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GetAccountAccessList', functi
     cb(true, { access = accessList })
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:GiveAccountAccess', function(params, cb, src)
     devPrint("GiveAccountAccess RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("GiveAccountAccess: requester not found")
-        NotifyClient(src, _U('error_invalid_data_provided'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data_provided'), "error", 4000)
         cb(false)
         return
     end
@@ -427,7 +427,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(
 
     if not requesterId or not account or firstName == '' or lastName == '' or not IsValidAccessLevel(level) then
         devPrint("GiveAccountAccess: Invalid input data.")
-        NotifyClient(src, _U('error_invalid_data_provided'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data_provided'), "error", 4000)
         cb(false)
         return
     end
@@ -436,7 +436,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(
     local otherCharacter = GetCharacterByName(firstName, lastName)
     if not otherCharacter then
         devPrint("GiveAccountAccess: character not found for name:", firstName, lastName)
-        NotifyClient(src, _U('error_target_character_not_found'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_target_character_not_found'), 'error', 4000)
         cb(false)
         return
     end
@@ -445,13 +445,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(
     -- Permission check
     if not (IsAccountAdmin(account, requesterId) or IsAccountOwner(account, requesterId)) then
         devPrint("GiveAccountAccess: Source", requesterId, "is not admin or owner of account", account)
-        NotifyClient(src, _U('error_no_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), "error", 4000)
         cb(false)
         return
     end
 
     if not isNearAccountBank(src, account) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -459,7 +459,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(
     -- Prevent giving access to self
     --[[if requesterId == otherCharacter then
         devPrint("GiveAccountAccess: Attempted to give access to self.")
-        NotifyClient(src, _U('warn_already_has_access_account'), "warning", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('warn_already_has_access_account'), "warning", 4000)
         cb(false)
         return
     end]]--
@@ -468,7 +468,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(
     devPrint("GiveAccountAccess result:", result)
 
     if not result or result.status == false then
-        NotifyClient(src, result.message or _U('error_failed_grant_access'), "error", 4000)
+        NotifyClient(src, result.message or Feather.Locale.translateUpper('error_failed_grant_access'), "error", 4000)
         cb(false)
         return
     end
@@ -486,18 +486,18 @@ exports['feather-core']:RegisterRPC('Feather:Banks:GiveAccountAccess', function(
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Account Access Granted', lines, 5763719)
-    NotifyClient(src, _U('success_access_granted'), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_access_granted'), "success", 4000)
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:RemoveAccountAccess', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:RemoveAccountAccess', function(params, cb, src)
     devPrint("RemoveAccountAccess RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("RemoveAccountAccess: requester not found")
-        NotifyClient(src, _U('error_invalid_input'), "error", 4000)
-        NotifyClient(src, _U('error_invalid_input'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), 'error', 4000)
         cb(false)
         return
     end
@@ -511,8 +511,8 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RemoveAccountAccess', functio
     -- Validate input
     if not requesterId or not account or not target then
         devPrint("RemoveAccountAccess: Invalid input data.")
-        NotifyClient(src, _U('error_invalid_input'), "error", 4000)
-        NotifyClient(src, _U('error_invalid_input'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_input'), 'error', 4000)
         cb(false)
         return
     end
@@ -520,14 +520,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RemoveAccountAccess', functio
     -- Permission check
     if not (IsAccountAdmin(account, requesterId) or IsAccountOwner(account, requesterId)) then
         devPrint("RemoveAccountAccess: Character", requesterId, "is not admin or owner of account", account)
-        NotifyClient(src, _U('error_no_permission'), "error", 4000)
-        NotifyClient(src, _U('error_no_permission'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_permission'), 'error', 4000)
         cb(false)
         return
     end
 
     if not isNearAccountBank(src, account) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
@@ -538,13 +538,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RemoveAccountAccess', functio
 
     if not success then
         devPrint("RemoveAccountAccess: Failed to remove access.")
-        NotifyClient(src, _U('error_failed_remove_access'), "error", 4000)
-        NotifyClient(src, _U('error_failed_remove_access'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_failed_remove_access'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_failed_remove_access'), 'error', 4000)
         cb(false)
         return
     end
 
-    NotifyClient(src, _U('success_access_removed'), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_access_removed'), "success", 4000)
     AddAccountTransaction(account, requesterId, 0, 'account access - removed', 'Removed access from character #' .. tostring(target))
     local accountRow = BccBanksInternal.getAccountSummary(account)
     local lines = {
@@ -559,13 +559,13 @@ exports['feather-core']:RegisterRPC('Feather:Banks:RemoveAccountAccess', functio
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:DepositCash', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:DepositCash', function(params, cb, src)
     devPrint("DepositCash RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("DepositCash: invalid player/char.")
-        NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
@@ -582,38 +582,38 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DepositCash', function(params
     devPrint("DepositCash: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Deposit then
-        NotifyClient(src, _U('error_no_deposit_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_deposit_permission'), "error", 4000)
         cb(false)
         return
     end
 
     if not IsFinitePositiveNumber(amount) then
-        NotifyClient(src, _U('error_invalid_deposit_amount'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_deposit_amount'), "error", 4000)
         cb(false)
         return
     end
 
     if not isNearAccountBank(src, account) then
-        NotifyClient(src, _U('error_not_at_bank'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), "error", 4000)
         cb(false)
         return
     end
 
     if (currentDollars or 0) < amount then
-        NotifyClient(src, _U('error_not_enough_cash', tostring(currentDollars or 0)), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash', tostring(currentDollars or 0)), "error", 4000)
         cb(false)
         return
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), "error", 4000)
         cb(false)
         return
     end
     local removed = pcall(function() char.DebitWallet(0, amount) end)
     if not removed then
         ReleasePlayerFinancialLock(src)
-        NotifyClient(src, _U('error_unable_deposit_cash'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_cash'), "error", 4000)
         cb(false)
         return
     end
@@ -621,7 +621,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DepositCash', function(params
         pcall(function() char.CreditWallet(0, amount) end)
         ReleasePlayerFinancialLock(src)
         devPrint("DepositCash: DB update failed.")
-        NotifyClient(src, _U('error_unable_deposit_cash') or 'Unable to deposit cash at this time.', "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_cash') or 'Unable to deposit cash at this time.', "error", 4000)
         cb(false)
         return
     end
@@ -640,18 +640,18 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DepositCash', function(params
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Cash Deposit', lines, 3066993)
-    NotifyClient(src, _U('success_deposit_cash', tostring(amount)) or ('Successfully deposited $' .. tostring(amount)), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_deposit_cash', tostring(amount)) or ('Successfully deposited $' .. tostring(amount)), "success", 4000)
     cb(true)
 end)
 
 -- Deposit Gold
-exports['feather-core']:RegisterRPC('Feather:Banks:DepositGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:DepositGold', function(params, cb, src)
     devPrint("DepositGold RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("DepositGold: invalid player/char.")
-        NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
@@ -668,38 +668,38 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DepositGold', function(params
     devPrint("DepositGold: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Deposit then
-        NotifyClient(src, _U('error_no_deposit_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_deposit_permission'), "error", 4000)
         cb(false)
         return
     end
 
     if not IsFinitePositiveNumber(amount) then
-        NotifyClient(src, _U('error_invalid_deposit_amount'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_deposit_amount'), "error", 4000)
         cb(false)
         return
     end
 
     if not isNearAccountBank(src, account) then
-        NotifyClient(src, _U('error_not_at_bank'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), "error", 4000)
         cb(false)
         return
     end
 
     if (currentGold or 0) < amount then
-        NotifyClient(src, _U('error_not_enough_gold_have', tostring(currentGold or 0)) or ('Not enough gold. You have ' .. tostring(currentGold or 0)), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_gold_have', tostring(currentGold or 0)) or ('Not enough gold. You have ' .. tostring(currentGold or 0)), "error", 4000)
         cb(false)
         return
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), "error", 4000)
         cb(false)
         return
     end
     local removed = pcall(function() char.DebitWallet(1, amount) end)
     if not removed then
         ReleasePlayerFinancialLock(src)
-        NotifyClient(src, _U('error_unable_deposit_gold'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_gold'), "error", 4000)
         cb(false)
         return
     end
@@ -707,7 +707,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DepositGold', function(params
         pcall(function() char.CreditWallet(1, amount) end)
         ReleasePlayerFinancialLock(src)
         devPrint("DepositGold: DB update failed.")
-        NotifyClient(src, _U('error_unable_deposit_gold'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_gold'), "error", 4000)
         cb(false)
         return
     end
@@ -726,17 +726,17 @@ exports['feather-core']:RegisterRPC('Feather:Banks:DepositGold', function(params
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Gold Deposit', lines, 15844367)
-    NotifyClient(src, _U('success_deposit_gold', tostring(amount)), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_deposit_gold', tostring(amount)), "success", 4000)
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawCash', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:WithdrawCash', function(params, cb, src)
     devPrint("WithdrawCash RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("WithdrawCash: invalid player/char.")
-        NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
@@ -752,19 +752,19 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawCash', function(param
     devPrint("WithdrawCash: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Withdraw_Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Withdraw_Deposit then
-        NotifyClient(src, _U('error_no_withdraw_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_withdraw_permission'), "error", 4000)
         cb(false)
         return
     end
 
     if not IsFinitePositiveNumber(amount) then
-        NotifyClient(src, _U('error_invalid_withdraw_amount'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_withdraw_amount'), "error", 4000)
         cb(false)
         return
     end
 
     if not isNearAccountBank(src, account) then
-        NotifyClient(src, _U('error_not_at_bank'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), "error", 4000)
         cb(false)
         return
     end
@@ -772,20 +772,20 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawCash', function(param
     -- Check frozen
     local accRow = GetAccount(account)
     if accRow and (accRow.is_frozen == 1 or accRow.is_frozen == true) then
-        NotifyClient(src, _U('error_account_frozen') or 'Account is frozen.', "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_account_frozen') or 'Account is frozen.', "error", 4000)
         cb(false)
         return
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), "error", 4000)
         cb(false)
         return
     end
     if not WithdrawCash(account, amount) then
         ReleasePlayerFinancialLock(src)
         devPrint("WithdrawCash: insufficient funds or DB failure.")
-        NotifyClient(src, _U('error_insufficient_account_funds'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_account_funds'), "error", 4000)
         cb(false)
         return
     end
@@ -793,7 +793,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawCash', function(param
     if not credited then
         DepositCash(account, amount)
         ReleasePlayerFinancialLock(src)
-        NotifyClient(src, _U('error_unable_withdraw'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_withdraw'), "error", 4000)
         cb(false)
         return
     end
@@ -812,17 +812,17 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawCash', function(param
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Cash Withdrawal', lines, 15105570)
-    NotifyClient(src, _U('success_withdraw_cash', tostring(amount)), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_withdraw_cash', tostring(amount)), "success", 4000)
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawGold', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:WithdrawGold', function(params, cb, src)
     devPrint("WithdrawGold RPC called. src=", src, "params=", params)
 
     local user = GetBankingContext(src)
     if not user then
         devPrint("WithdrawGold: invalid player/char.")
-        NotifyClient(src, _U('error_invalid_character_data'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), "error", 4000)
         cb(false)
         return
     end
@@ -838,19 +838,19 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawGold', function(param
     devPrint("WithdrawGold: accessLevel=", accessLevel, "required <=", Config.AccessLevels.Withdraw_Deposit)
 
     if not accessLevel or accessLevel > Config.AccessLevels.Withdraw_Deposit then
-        NotifyClient(src, _U('error_no_withdraw_permission'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_withdraw_permission'), "error", 4000)
         cb(false)
         return
     end
 
     if not IsFinitePositiveNumber(amount) then
-        NotifyClient(src, _U('error_invalid_withdraw_amount'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_withdraw_amount'), "error", 4000)
         cb(false)
         return
     end
 
     if not isNearAccountBank(src, account) then
-        NotifyClient(src, _U('error_not_at_bank'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), "error", 4000)
         cb(false)
         return
     end
@@ -858,20 +858,20 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawGold', function(param
     -- Check frozen
     local accRow = GetAccount(account)
     if accRow and (accRow.is_frozen == 1 or accRow.is_frozen == true) then
-        NotifyClient(src, _U('error_account_frozen') or 'Account is frozen.', "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_account_frozen') or 'Account is frozen.', "error", 4000)
         cb(false)
         return
     end
 
     if not AcquirePlayerFinancialLock(src) then
-        NotifyClient(src, _U('error_financial_operation_busy'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), "error", 4000)
         cb(false)
         return
     end
     if not WithdrawGold(account, amount) then
         ReleasePlayerFinancialLock(src)
         devPrint("WithdrawGold: insufficient funds or DB failure.")
-        NotifyClient(src, _U('error_insufficient_account_funds'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_account_funds'), "error", 4000)
         cb(false)
         return
     end
@@ -879,7 +879,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawGold', function(param
     if not credited then
         DepositGold(account, amount)
         ReleasePlayerFinancialLock(src)
-        NotifyClient(src, _U('error_unable_withdraw'), "error", 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_withdraw'), "error", 4000)
         cb(false)
         return
     end
@@ -898,16 +898,16 @@ exports['feather-core']:RegisterRPC('Feather:Banks:WithdrawGold', function(param
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Gold Withdrawal', lines, 15105570)
-    NotifyClient(src, _U('success_withdraw_gold', tostring(amount)), "success", 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_withdraw_gold', tostring(amount)), "success", 4000)
     cb(true)
 end)
 
 -- Transfer Cash between accounts (applies fee when banks differ)
-exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:TransferCash', function(params, cb, src)
     devPrint("TransferCash RPC called. src=", src, "params=", params)
 
     if not (Config.Transfer and Config.Transfer.Enabled) then
-        NotifyClient(src, _U('error_unable_transfer'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_unable_transfer'), 'error', 4000)
         cb(false)
         return
     end
@@ -915,7 +915,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
     local user = GetBankingContext(src)
     if not user then
         devPrint("TransferCash: invalid player/char.")
-        NotifyClient(src, _U('error_invalid_character_data'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_data'), 'error', 4000)
         cb(false)
         return
     end
@@ -936,7 +936,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
     )
 
     if not fromAccountId or (not toAccountNumber and not toAccountId) or not IsFinitePositiveNumber(amount) then
-        NotifyClient(src, _U('error_invalid_transfer_input'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_transfer_input'), 'error', 4000)
         cb(false)
         return
     end
@@ -944,26 +944,26 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
     local accessLevel = GetAccountAccess(fromAccountId, char.characterId)
     devPrint("Access level for fromAccount:", fromAccountId, "char:", char.characterId, "=", accessLevel)
     if not accessLevel or accessLevel > Config.AccessLevels.Withdraw_Deposit then
-        NotifyClient(src, _U('error_no_withdraw_permission'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_no_withdraw_permission'), 'error', 4000)
         cb(false)
         return
     end
 
     local fromAcc = GetAccount(fromAccountId)
     if not fromAcc then
-        NotifyClient(src, _U('error_invalid_account'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account'), 'error', 4000)
         cb(false)
         return
     end
 
     if not IsPlayerNearBank(src, fromAcc.bank_id) then
-        NotifyClient(src, _U('error_not_at_bank'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
     end
 
     if fromAcc and (fromAcc.is_frozen == 1 or fromAcc.is_frozen == true) then
-        NotifyClient(src, _U('error_account_frozen') or 'Source account is frozen.', 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_account_frozen') or 'Source account is frozen.', 'error', 4000)
         cb(false)
         return
     end
@@ -977,7 +977,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
         toAcc = GetAccountByNumber(toAccountNumber)
     end
     if not toAcc then
-        NotifyClient(src, _U('error_invalid_destination_account'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_destination_account'), 'error', 4000)
         cb(false)
         return
     end
@@ -985,7 +985,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
     devPrint("Loaded toAcc -> id:", toAcc.id, "bank:", toAcc.bank_id, "cash:", toAcc.cash)
 
     if IdsEqual(toAcc.id, fromAcc.id) then
-        NotifyClient(src, _U('error_same_account_transfer'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_same_account_transfer'), 'error', 4000)
         cb(false)
         return
     end
@@ -1008,7 +1008,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
     local current = tonumber(fromAcc.cash) or 0
     devPrint("From current cash:", current, ">= totalDebit?", current >= totalDebit)
     if current < totalDebit then
-        NotifyClient(src, _U('error_insufficient_account_funds'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_account_funds'), 'error', 4000)
         cb(false)
         return
     end
@@ -1017,7 +1017,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
     -- the same source balance or leave a half-completed transfer.
     if not TransferAccountCash(fromAcc.id, toAcc.id, totalDebit, amount) then
         devPrint("Atomic transfer failed or source funds changed")
-        NotifyClient(src, _U('error_insufficient_account_funds'), 'error', 4000)
+        NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_account_funds'), 'error', 4000)
         cb(false)
         return
     end
@@ -1047,12 +1047,11 @@ exports['feather-core']:RegisterRPC('Feather:Banks:TransferCash', function(param
     }
     BccBanksInternal.appendActorLines(lines, src)
     QueueBankAuditLog('Bank Transfer Completed', lines, 3447003)
-    NotifyClient(src, _U('success_transfer', tostring(amount)), 'success', 4000)
+    NotifyClient(src, Feather.Locale.translateUpper('success_transfer', tostring(amount)), 'success', 4000)
     cb(true, { fee = fee, debited = totalDebit })
 end)
 
-RegisterNetEvent("Feather:Banks:MenuClosed", function()
-    local src = source
+exports['feather-core']:RegisterRPC('bcc-banks:MenuClosed', function(_, _, src)
     devPrint("MenuClosed: clearing account locks for src=", src)
     ClearAccountLocks(src)
     ClearBankerBusy(src)

@@ -99,19 +99,19 @@ local function sendLoanStatusMail(loan, status)
     if status == 'rejected' and cfg.SendOnReject == false then return end
 
     local bankName  = getBankNameForLoan(loan)
-    local bankLabel = bankName or cfg.MailFrom or _U('mail_sender_default') or 'Bank'
-    local fromName  = cfg.MailFrom or bankName or _U('mail_sender_default') or 'Bank Postmaster'
+    local bankLabel = bankName or cfg.MailFrom or Feather.Locale.translateUpper('mail_sender_default') or 'Bank'
+    local fromName  = cfg.MailFrom or bankName or Feather.Locale.translateUpper('mail_sender_default') or 'Bank Postmaster'
     local amountText = formatCurrency(loan.amount)
 
     local subject
     if status == 'approved' then
         subject = cfg.ApproveSubject
             and safeFormat(cfg.ApproveSubject, amountText, bankLabel, tostring(loan.id or ''))
-            or  (_U('mail_loan_approved_subject') or 'Loan Approved')
+            or  (Feather.Locale.translateUpper('mail_loan_approved_subject') or 'Loan Approved')
     else
         subject = cfg.RejectSubject
             and safeFormat(cfg.RejectSubject, amountText, bankLabel, tostring(loan.id or ''))
-            or  (_U('mail_loan_rejected_subject') or 'Loan Rejected')
+            or  (Feather.Locale.translateUpper('mail_loan_rejected_subject') or 'Loan Rejected')
     end
 
     local body
@@ -119,20 +119,20 @@ local function sendLoanStatusMail(loan, status)
         if cfg.ApproveBody then
             body = safeFormat(cfg.ApproveBody, amountText, bankLabel, tostring(loan.id or ''))
         else
-            local intro      = _U('mail_loan_approved_body_intro') or 'Your loan request has been approved.'
-            local outro      = _U('mail_loan_approved_body_outro') or 'Visit the bank to access the funds.'
-            local amountLine = (_U('mail_amount_label') or 'Amount: ') .. amountText
-            local bankLine   = (_U('mail_bank_label')   or 'Bank: ')   .. bankLabel
+            local intro      = Feather.Locale.translateUpper('mail_loan_approved_body_intro') or 'Your loan request has been approved.'
+            local outro      = Feather.Locale.translateUpper('mail_loan_approved_body_outro') or 'Visit the bank to access the funds.'
+            local amountLine = (Feather.Locale.translateUpper('mail_amount_label') or 'Amount: ') .. amountText
+            local bankLine   = (Feather.Locale.translateUpper('mail_bank_label')   or 'Bank: ')   .. bankLabel
             body = table.concat({ intro, amountLine, bankLine, outro }, '\n')
         end
     else
         if cfg.RejectBody then
             body = safeFormat(cfg.RejectBody, amountText, bankLabel, tostring(loan.id or ''))
         else
-            local intro      = _U('mail_loan_rejected_body_intro') or 'Your loan request has been rejected.'
-            local outro      = _U('mail_loan_rejected_body_outro') or 'Please contact the bank for details.'
-            local amountLine = (_U('mail_amount_label') or 'Amount: ') .. amountText
-            local bankLine   = (_U('mail_bank_label')   or 'Bank: ')   .. bankLabel
+            local intro      = Feather.Locale.translateUpper('mail_loan_rejected_body_intro') or 'Your loan request has been rejected.'
+            local outro      = Feather.Locale.translateUpper('mail_loan_rejected_body_outro') or 'Please contact the bank for details.'
+            local amountLine = (Feather.Locale.translateUpper('mail_amount_label') or 'Amount: ') .. amountText
+            local bankLine   = (Feather.Locale.translateUpper('mail_bank_label')   or 'Bank: ')   .. bankLabel
             body = table.concat({ intro, amountLine, bankLine, outro }, '\n')
         end
     end
@@ -184,8 +184,8 @@ function IsBankAdmin(src)
     return false
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:CheckAdmin', function(_, cb, src)
-    devPrint('[DEV] RPC Feather:Banks:CheckAdmin called by src=' .. tostring(src))
+exports['feather-core']:RegisterRPC('bcc-banks:CheckAdmin', function(_, cb, src)
+    devPrint('[DEV] RPC bcc-banks:CheckAdmin called by src=' .. tostring(src))
     local allowed = IsBankAdmin(src) == true
     -- Return (ok=true, payload=allowed) to match other RPC patterns
     cb(true, allowed)
@@ -198,17 +198,17 @@ local function isValidInterestRate(value)
         and rate >= 0 and rate <= 100
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetBankRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetBankRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] GetBankRate denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local bankId = NormalizeId(params and params.bank)
     if not bankId then
         devPrint('[ADMIN] GetBankRate invalid bank id:', params and params.bank)
-        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
         cb(false)
         return
     end
@@ -217,10 +217,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetBankRate', function(
     cb(true, rate and tonumber(rate) or nil)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetBankRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetBankRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] SetBankRate denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -228,7 +228,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetBankRate', function(
     local rate = tonumber(params and params.rate)
     if not bankId or not isValidInterestRate(rate) then
         devPrint('[ADMIN] SetBankRate invalid input bankId/rate:', bankId, rate)
-        NotifyClient(src, _U('admin_invalid_input') or 'Invalid input', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_input') or 'Invalid input', 'error', 3500)
         cb(false)
         return
     end
@@ -237,10 +237,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetBankRate', function(
 end)
 
 -- RPC: get/set/clear char rate
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetCharRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetCharRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] GetCharRate denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -248,7 +248,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetCharRate', function(
     local bankId = NormalizeId(params and params.bank)
     if not charId then
         devPrint('[ADMIN] GetCharRate invalid char id:', params and params.char)
-        NotifyClient(src, _U('admin_invalid_char_id') or 'Invalid char id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_char_id') or 'Invalid char id', 'error', 3500)
         cb(false)
         return
     end
@@ -263,10 +263,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetCharRate', function(
     cb(true, rate and tonumber(rate) or nil)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetCharRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetCharRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] SetCharRate denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -275,7 +275,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetCharRate', function(
     local rate = tonumber(params and params.rate)
     if not charId or not isValidInterestRate(rate) then
         devPrint('[ADMIN] SetCharRate invalid input charId/rate:', charId, rate)
-        NotifyClient(src, _U('admin_invalid_input') or 'Invalid input', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_input') or 'Invalid input', 'error', 3500)
         cb(false)
         return
     end
@@ -288,10 +288,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetCharRate', function(
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ClearCharRate', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ClearCharRate', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ClearCharRate denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -299,7 +299,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ClearCharRate', functio
     local bankId = NormalizeId(params and params.bank)
     if not charId then
         devPrint('[ADMIN] ClearCharRate invalid char id:', params and params.char)
-        NotifyClient(src, _U('admin_invalid_char_id') or 'Invalid char id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_char_id') or 'Invalid char id', 'error', 3500)
         cb(false)
         return
     end
@@ -337,17 +337,17 @@ local function attachLoanBorrowerNames(rows)
     end
 end
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListAccounts', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListAccounts', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListAccounts denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local bankId = NormalizeId(params and params.bank)
     if not bankId then
         devPrint('[ADMIN] ListAccounts invalid bank id:', params and params.bank)
-        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
         cb(false)
         return
     end
@@ -360,10 +360,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListAccounts', function
     cb(true, rows or {})
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListFrozenAccounts', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListFrozenAccounts', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListFrozenAccounts denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -371,7 +371,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListFrozenAccounts', fu
     local bankId = NormalizeId(params and params.bank)
     if not bankId then
         devPrint('[ADMIN] ListFrozenAccounts invalid bank id:', params and params.bank)
-        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
         cb(false)
         return
     end
@@ -386,10 +386,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListFrozenAccounts', fu
 end)
 
 -- Admin: get full account details (bypass access rules, admin-only)
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetAccount', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] GetAccount denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -397,7 +397,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetAccount', function(p
     local accId = NormalizeId(params and params.account)
     if not accId then
         devPrint('[ADMIN] GetAccount invalid account id:', params and params.account)
-        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
         cb(false)
         return
     end
@@ -429,10 +429,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetAccount', function(p
     cb(true, { account = row, transactions = tx or {} })
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:UnfreezeAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:UnfreezeAccount', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] UnfreezeAccount denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -440,7 +440,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:UnfreezeAccount', funct
     local accId = NormalizeId(params and params.account)
     if not accId then
         devPrint('[ADMIN] UnfreezeAccount invalid account id:', params and params.account)
-        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
         cb(false)
         return
     end
@@ -448,7 +448,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:UnfreezeAccount', funct
     local row = MySQL.query.await('SELECT owner_id, is_frozen FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
     row = row and row[1] or nil
     if not row then
-        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
         cb(false)
         return
     end
@@ -468,10 +468,10 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:UnfreezeAccount', funct
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetAccountFrozen', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetAccountFrozen', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] SetAccountFrozen denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -480,14 +480,14 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetAccountFrozen', func
     local shouldFreeze = params and params.frozen
     if not accId or type(shouldFreeze) ~= 'boolean' then
         devPrint('[ADMIN] SetAccountFrozen invalid params:', params)
-        NotifyClient(src, _U('admin_invalid_account_freeze') or 'Invalid account/state.', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_account_freeze') or 'Invalid account/state.', 'error', 3500)
         cb(false)
         return
     end
 
     local row = MySQL.query.await('SELECT id FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
     if not row or not row[1] then
-        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
         cb(false)
         return
     end
@@ -496,12 +496,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetAccountFrozen', func
     cb(true, { is_frozen = shouldFreeze })
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:DeleteAccount', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:DeleteAccount', function(params, cb, src)
     devPrint('[ADMIN] DeleteAccount called by src=', src, 'params=', params)
 
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] DeleteAccount denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -509,7 +509,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:DeleteAccount', functio
     local accId = NormalizeId(params and params.account)
     if not accId then
         devPrint('[ADMIN] DeleteAccount invalid account id:', params and params.account)
-        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
         cb(false)
         return
     end
@@ -517,7 +517,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:DeleteAccount', functio
     local row = GetAccount(accId)
     if not row then
         devPrint('[ADMIN] DeleteAccount failed: account not found for id', accId)
-        NotifyClient(src, _U('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
         cb(false)
         return
     end
@@ -531,17 +531,17 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:DeleteAccount', functio
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListLoans', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListLoans', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListLoans denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local bankId = NormalizeId(params and params.bank)
     if not bankId then
         devPrint('[ADMIN] ListLoans invalid bank id:', params and params.bank)
-        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
         cb(false)
         return
     end
@@ -561,17 +561,17 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListLoans', function(pa
 end)
 
 -- List only pending loans by bank
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListPendingLoans', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListPendingLoans', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListPendingLoans denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local bankId = NormalizeId(params and params.bank)
     if not bankId then
         devPrint('[ADMIN] ListPendingLoans invalid bank id:', params and params.bank)
-        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
         cb(false)
         return
     end
@@ -591,22 +591,22 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListPendingLoans', func
 end)
 
 -- Approve a loan
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ApproveLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ApproveLoan', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ApproveLoan denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local loanId = NormalizeId(params and params.loan)
     if not loanId then
-        NotifyClient(src, _U('admin_invalid_loan_id') or 'Invalid loan id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_loan_id') or 'Invalid loan id', 'error', 3500)
         cb(false)
         return
     end
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_character_not_found') or 'Character not found', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found') or 'Character not found', 'error', 3500)
         cb(false)
         return
     end
@@ -626,31 +626,31 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ApproveLoan', function(
         }
         QueueBankAuditLog('Bank Loan Approved', lines, 3066993)
         AddLoanTransaction(loanId, res.loan and res.loan.character_id, tonumber(res.loan and res.loan.amount) or 0, 'loan - approved', 'Loan approved by character #' .. tostring(approver))
-        NotifyClient(src, _U('admin_loan_approved') or 'Loan approved and disbursed.', 'success', 3000)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_loan_approved') or 'Loan approved and disbursed.', 'success', 3000)
         cb(true)
     else
-        NotifyClient(src, (res and res.message) or _U('admin_failed_approve_loan') or 'Failed to approve loan.', 'error', 3500)
+        NotifyClient(src, (res and res.message) or Feather.Locale.translateUpper('admin_failed_approve_loan') or 'Failed to approve loan.', 'error', 3500)
         cb(false)
     end
 end)
 
 -- Reject a loan
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:RejectLoan', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:RejectLoan', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] RejectLoan denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local loanId = NormalizeId(params and params.loan)
     if not loanId then
-        NotifyClient(src, _U('admin_invalid_loan_id') or 'Invalid loan id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_loan_id') or 'Invalid loan id', 'error', 3500)
         cb(false)
         return
     end
     local user = GetBankingContext(src)
     if not user then
-        NotifyClient(src, _U('error_character_not_found') or 'Character not found', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('error_character_not_found') or 'Character not found', 'error', 3500)
         cb(false)
         return
     end
@@ -670,25 +670,25 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:RejectLoan', function(p
         }
         QueueBankAuditLog('Bank Loan Rejected', lines, 15158332)
         AddLoanTransaction(loanId, res.loan and res.loan.character_id, tonumber(res.loan and res.loan.amount) or 0, 'loan - rejected', 'Loan rejected by character #' .. tostring(approver))
-        NotifyClient(src, _U('admin_loan_rejected') or 'Loan rejected.', 'success', 3000)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_loan_rejected') or 'Loan rejected.', 'success', 3000)
         cb(true)
     else
-        NotifyClient(src, (res and res.message) or _U('admin_failed_reject_loan') or 'Failed to reject loan.', 'error', 3500)
+        NotifyClient(src, (res and res.message) or Feather.Locale.translateUpper('admin_failed_reject_loan') or 'Failed to reject loan.', 'error', 3500)
         cb(false)
     end
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ListSDBs', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListSDBs', function(params, cb, src)
     if not IsBankAdmin(src) then
         devPrint('[ADMIN] ListSDBs denied: no permission for src', src)
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local bankId = NormalizeId(params and params.bank)
     if not bankId then
         devPrint('[ADMIN] ListSDBs invalid bank id:', params and params.bank)
-        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
         cb(false)
         return
     end
@@ -699,15 +699,15 @@ end)
 -- Legacy admin commands were removed in favor of the /bankadmin UI.
 
 -- Admin: Get/Set bank opening hours
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetHours', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetHours', function(params, cb, src)
     if not IsBankAdmin(src) then
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local bankId = NormalizeId(params and params.bank)
     if not bankId then
-        NotifyClient(src, _U('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_bank_id') or 'Invalid bank id', 'error', 3500)
         cb(false)
         return
     end
@@ -720,9 +720,9 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:GetHours', function(par
     cb(true, { hours_active = (data.hours_active == 1 or data.hours_active == true), open_hour = data.open_hour, close_hour = data.close_hour })
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetHours', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetHours', function(params, cb, src)
     if not IsBankAdmin(src) then
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
@@ -731,12 +731,12 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetHours', function(par
     local openH = tonumber(params and params.open)
     local closeH = tonumber(params and params.close)
     if not bankId or openH == nil or closeH == nil then
-        NotifyClient(src, _U('admin_invalid_hours_input') or 'Enter valid bank id and hours.', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_hours_input') or 'Enter valid bank id and hours.', 'error', 3500)
         cb(false)
         return
     end
     if openH < 0 or openH > 23 or closeH < 0 or closeH > 23 then
-        NotifyClient(src, _U('admin_hours_range_error') or 'Hours must be 0-23.', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_hours_range_error') or 'Hours must be 0-23.', 'error', 3500)
         cb(false)
         return
     end
@@ -752,7 +752,7 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetHours', function(par
     end
     MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ?, open_hour = ?, close_hour = ? WHERE id = ?', { actv, openH, closeH, bankId })
     -- Notify all clients to refresh bank data
-    TriggerClientEvent('Feather:Banks:Refresh', -1)
+    TriggerClientEvent('bcc-banks:Refresh', -1)
     local adminUser = GetBankingContext(src)
     local adminId = adminUser and adminUser.characterId or 'Unknown'
     local lines = {
@@ -767,22 +767,22 @@ exports['feather-core']:RegisterRPC('Feather:Banks:Admin:SetHours', function(par
     cb(true)
 end)
 
-exports['feather-core']:RegisterRPC('Feather:Banks:Admin:ToggleHours', function(params, cb, src)
+exports['feather-core']:RegisterRPC('bcc-banks:Admin:ToggleHours', function(params, cb, src)
     if not IsBankAdmin(src) then
-        NotifyClient(src, _U('admin_no_permission') or 'No permission', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_no_permission') or 'No permission', 'error', 3500)
         cb(false)
         return
     end
     local bankId = NormalizeId(params and params.bank)
     local active = params and params.active
     if not bankId or type(active) ~= 'boolean' then
-        NotifyClient(src, _U('admin_invalid_hours_toggle') or 'Enter valid bank id and toggle.', 'error', 3500)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_invalid_hours_toggle') or 'Enter valid bank id and toggle.', 'error', 3500)
         cb(false)
         return
     end
     local actv = active and 1 or 0
     MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ? WHERE id = ?', { actv, bankId })
-    TriggerClientEvent('Feather:Banks:Refresh', -1)
+    TriggerClientEvent('bcc-banks:Refresh', -1)
     local adminUser = GetBankingContext(src)
     local adminId = adminUser and adminUser.characterId or 'Unknown'
     local lines = {

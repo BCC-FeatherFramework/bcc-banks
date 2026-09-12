@@ -18,7 +18,7 @@ end
 function BankOpen()
   if not OpenPrompt then
     local result = exports['feather-toolkit']:CreatePrompt({
-      label = _U('menu_prompt'), control = Config.PromptSettings.TellerKey, groupId = OpenGroup,
+      label = Feather.Locale.translateUpper('menu_prompt'), control = Config.PromptSettings.TellerKey, groupId = OpenGroup,
       enabled = true, visible = true, pulsing = false, mode = 'hold', holdMode = 'SHORT_TIMED_EVENT'
     })
     if not result or result.ok ~= true then
@@ -31,7 +31,7 @@ end
 function BankClosed()
   if not ClosedPrompt then
     local result = exports['feather-toolkit']:CreatePrompt({
-      label = _U('menu_prompt'), control = Config.PromptSettings.TellerKey, groupId = ClosedGroup,
+      label = Feather.Locale.translateUpper('menu_prompt'), control = Config.PromptSettings.TellerKey, groupId = ClosedGroup,
       enabled = false, visible = true, pulsing = false, mode = 'hold', holdMode = 'SHORT_TIMED_EVENT'
     })
     if not result or result.ok ~= true then

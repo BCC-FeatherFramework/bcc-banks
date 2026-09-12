@@ -1,4 +1,4 @@
-Locales["ro_lang"] = {
+Feather.Locale.register("ro", {
     bank_label = "Banca",
     door_prompt_group = "Usa",
     door_open_prompt = "Deschide usa",
@@ -524,4 +524,4 @@ Locales["ro_lang"] = {
     error_loan_operation_busy = "Acest împrumut este deja actualizat. Încearcă din nou.",
     error_financial_operation_busy = "O altă operațiune financiară este în curs. Încearcă din nou.",
     error_unable_withdraw = "Retragerea nu a putut fi finalizată.",
-}
+})

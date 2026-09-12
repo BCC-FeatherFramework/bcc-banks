@@ -1,6 +1,5 @@
 Config = {
 	devMode            = true,
-	defaultlang        = 'en_lang',
 	Notify             = "feather-notify", -- Feather port notification provider
 	UseBankerBusy      = true,        -- If enabled only 1 person can use the bank at a time
 

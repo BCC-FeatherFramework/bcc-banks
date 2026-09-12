@@ -9,12 +9,12 @@ author 'BCC Scripts'
 shared_scripts {
    'shared/helpers/*.lua',
    'shared/config.lua',
-   'shared/locale.lua',
-   'languages/*.lua',
 }
 
 client_scripts {
+   'client/feather/init.lua',
    'client/feather/menu_v2.lua',
+   'languages/*.lua',
    'client/helpers/*.lua',
    'client/services/*.lua',
    'client/menus/*.lua',
@@ -23,7 +23,9 @@ client_scripts {
 
 server_scripts {
    '@oxmysql/lib/MySQL.lua',
+   'server/feather/init.lua',
    'server/feather/economy.lua',
+   'languages/*.lua',
    'server/api-loader.lua',
    'server/helpers/*.lua',
    'server/controllers/*.lua',
@@ -40,6 +42,7 @@ dependencies {
    'feather-roles',
    'feather-inventory',
    'feather-menu-v2',
+   'bcc-chat',
 }
 
 files {

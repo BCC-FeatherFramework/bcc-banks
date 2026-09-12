@@ -5,11 +5,11 @@ function OpenWriteCheckPage(account, ParentPage)
     local WritePage = FeatherBankMenu:RegisterPage('bank:page:check:write:' .. tostring(account.id))
 
     WritePage:RegisterElement('header', {
-        value = _U('write_check_header'),
+        value = Feather.Locale.translateUpper('write_check_header'),
         slot  = 'header'
     })
     WritePage:RegisterElement('subheader', {
-        value = _U('write_check_subheader'),
+        value = Feather.Locale.translateUpper('write_check_subheader'),
         slot  = 'header'
     })
     WritePage:RegisterElement('line', { slot = 'header', style = {} })
@@ -20,32 +20,32 @@ function OpenWriteCheckPage(account, ParentPage)
     local memo      = ''
 
     WritePage:RegisterElement('input', {
-        label       = _U('check_recipient_label'),
-        placeholder = _U('check_recipient_placeholder'),
+        label       = Feather.Locale.translateUpper('check_recipient_label'),
+        placeholder = Feather.Locale.translateUpper('check_recipient_placeholder'),
         style       = {}
     }, function(data)
         firstName = data.value or ''
     end)
 
     WritePage:RegisterElement('input', {
-        label       = _U('check_recipient_last_label'),
-        placeholder = _U('check_recipient_last_placeholder'),
+        label       = Feather.Locale.translateUpper('check_recipient_last_label'),
+        placeholder = Feather.Locale.translateUpper('check_recipient_last_placeholder'),
         style       = {}
     }, function(data)
         lastName = data.value or ''
     end)
 
     WritePage:RegisterElement('input', {
-        label       = _U('check_amount_label'),
-        placeholder = _U('check_amount_placeholder'),
+        label       = Feather.Locale.translateUpper('check_amount_label'),
+        placeholder = Feather.Locale.translateUpper('check_amount_placeholder'),
         style       = {}
     }, function(data)
         amount = tonumber(data.value)
     end)
 
     WritePage:RegisterElement('input', {
-        label       = _U('check_memo_label'),
-        placeholder = _U('check_memo_placeholder'),
+        label       = Feather.Locale.translateUpper('check_memo_label'),
+        placeholder = Feather.Locale.translateUpper('check_memo_placeholder'),
         style       = {}
     }, function(data)
         memo = data.value or ''
@@ -54,7 +54,7 @@ function OpenWriteCheckPage(account, ParentPage)
     WritePage:RegisterElement('line', { slot = 'footer', style = {} })
 
     WritePage:RegisterElement('button', {
-        label = _U('write_check_button'),
+        label = Feather.Locale.translateUpper('write_check_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -62,28 +62,28 @@ function OpenWriteCheckPage(account, ParentPage)
         local ln = lastName:match('^%s*(.-)%s*$')
 
         if fn == '' or ln == '' then
-            Notify(_U('invalid_check_recipient'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_check_recipient'), 4000)
             return
         end
         if not amount or amount <= 0 then
-            Notify(_U('invalid_check_amount'), 4000)
+            Notify(Feather.Locale.translateUpper('invalid_check_amount'), 4000)
             return
         end
 
         local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:check:write:confirm:' .. tostring(account.id))
         ConfirmPage:RegisterElement('header', {
-            value = _U('check_confirm_header'),
+            value = Feather.Locale.translateUpper('check_confirm_header'),
             slot  = 'header'
         })
         ConfirmPage:RegisterElement('textdisplay', {
-            value = _U('check_confirm_text', tostring(amount), fn, ln),
+            value = Feather.Locale.translateUpper('check_confirm_text', tostring(amount), fn, ln),
             style = { ['text-align'] = 'center' }
         })
         ConfirmPage:RegisterElement('button', {
-            label = _U('confirm_button'),
+            label = Feather.Locale.translateUpper('confirm_button'),
             style = {}
         }, function()
-            local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:WriteCheck', {
+            local ok = exports['feather-core']:CallRPCAsync('bcc-banks:WriteCheck', {
                 account    = account.id,
                 first_name = fn,
                 last_name  = ln,
@@ -96,7 +96,7 @@ function OpenWriteCheckPage(account, ParentPage)
         end)
         ConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
         ConfirmPage:RegisterElement('button', {
-            label = _U('back_button'),
+            label = Feather.Locale.translateUpper('back_button'),
             slot  = 'footer',
             style = {}
         }, function()
@@ -107,7 +107,7 @@ function OpenWriteCheckPage(account, ParentPage)
     end)
 
     WritePage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -125,28 +125,28 @@ function OpenIssuedChecksPage(account, ParentPage)
     local IssuedPage = FeatherBankMenu:RegisterPage('bank:page:check:issued:' .. tostring(account.id))
 
     IssuedPage:RegisterElement('header', {
-        value = _U('issued_checks_header'),
+        value = Feather.Locale.translateUpper('issued_checks_header'),
         slot  = 'header'
     })
     IssuedPage:RegisterElement('subheader', {
-        value = _U('issued_checks_subheader'),
+        value = Feather.Locale.translateUpper('issued_checks_subheader'),
         slot  = 'header'
     })
     IssuedPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, checks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetIssuedChecks', { account = account.id })
+    local ok, checks = exports['feather-core']:CallRPCAsync('bcc-banks:GetIssuedChecks', { account = account.id })
     checks = (ok and checks) or {}
 
     if #checks == 0 then
         IssuedPage:RegisterElement('textdisplay', {
-            value = _U('no_issued_checks_found'),
+            value = Feather.Locale.translateUpper('no_issued_checks_found'),
             style = { ['text-align'] = 'center', color = 'gray' }
         })
     else
         for _, check in ipairs(checks) do
             local rFirst = check.recipient_first or '?'
             local rLast  = check.recipient_last  or '?'
-            local label  = _U('issued_check_label', tostring(check.amount), rFirst, rLast)
+            local label  = Feather.Locale.translateUpper('issued_check_label', tostring(check.amount), rFirst, rLast)
             if check.memo and check.memo ~= '' then
                 label = label .. ' — ' .. tostring(check.memo)
             end
@@ -157,23 +157,23 @@ function OpenIssuedChecksPage(account, ParentPage)
             }, function()
                 local VoidConfirmPage = FeatherBankMenu:RegisterPage('bank:page:check:void:' .. tostring(check.id))
                 VoidConfirmPage:RegisterElement('header', {
-                    value = _U('check_void_confirm_header'),
+                    value = Feather.Locale.translateUpper('check_void_confirm_header'),
                     slot  = 'header'
                 })
                 VoidConfirmPage:RegisterElement('textdisplay', {
-                    value = _U('check_void_confirm_text', tostring(check.amount)),
+                    value = Feather.Locale.translateUpper('check_void_confirm_text', tostring(check.amount)),
                     style = { ['text-align'] = 'center' }
                 })
                 VoidConfirmPage:RegisterElement('button', {
-                    label = _U('void_check_button'),
+                    label = Feather.Locale.translateUpper('void_check_button'),
                     style = {}
                 }, function()
-                    exports['feather-core']:CallRPCAsync('Feather:Banks:VoidCheck', { check_id = check.id })
+                    exports['feather-core']:CallRPCAsync('bcc-banks:VoidCheck', { check_id = check.id })
                     OpenIssuedChecksPage(account, ParentPage)
                 end)
                 VoidConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
                 VoidConfirmPage:RegisterElement('button', {
-                    label = _U('back_button'),
+                    label = Feather.Locale.translateUpper('back_button'),
                     slot  = 'footer',
                     style = {}
                 }, function()
@@ -187,7 +187,7 @@ function OpenIssuedChecksPage(account, ParentPage)
 
     IssuedPage:RegisterElement('line', { slot = 'footer', style = {} })
     IssuedPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -204,28 +204,28 @@ function OpenCashCheckPage(bank, ParentPage)
     local CashPage = FeatherBankMenu:RegisterPage('bank:page:check:cash:' .. tostring(bank.id))
 
     CashPage:RegisterElement('header', {
-        value = _U('cash_check_header'),
+        value = Feather.Locale.translateUpper('cash_check_header'),
         slot  = 'header'
     })
     CashPage:RegisterElement('subheader', {
-        value = _U('cash_check_subheader'),
+        value = Feather.Locale.translateUpper('cash_check_subheader'),
         slot  = 'header'
     })
     CashPage:RegisterElement('line', { slot = 'header', style = {} })
 
-    local ok, checks = exports['feather-core']:CallRPCAsync('Feather:Banks:GetMyChecks', {})
+    local ok, checks = exports['feather-core']:CallRPCAsync('bcc-banks:GetMyChecks', {})
     checks = (ok and checks) or {}
 
     if #checks == 0 then
         CashPage:RegisterElement('textdisplay', {
-            value = _U('no_checks_found'),
+            value = Feather.Locale.translateUpper('no_checks_found'),
             style = { ['text-align'] = 'center', color = 'gray' }
         })
     else
         for _, check in ipairs(checks) do
             local iFirst = check.issuer_first or '?'
             local iLast  = check.issuer_last  or '?'
-            local label  = _U('check_label', tostring(check.amount), iFirst, iLast)
+            local label  = Feather.Locale.translateUpper('check_label', tostring(check.amount), iFirst, iLast)
             if check.memo and check.memo ~= '' then
                 label = label .. ' — ' .. tostring(check.memo)
             end
@@ -236,23 +236,23 @@ function OpenCashCheckPage(bank, ParentPage)
             }, function()
                 local ConfirmPage = FeatherBankMenu:RegisterPage('bank:page:check:cash:confirm:' .. tostring(check.id))
                 ConfirmPage:RegisterElement('header', {
-                    value = _U('check_cash_confirm_header'),
+                    value = Feather.Locale.translateUpper('check_cash_confirm_header'),
                     slot  = 'header'
                 })
                 ConfirmPage:RegisterElement('textdisplay', {
-                    value = _U('check_cash_confirm_text', tostring(check.amount)),
+                    value = Feather.Locale.translateUpper('check_cash_confirm_text', tostring(check.amount)),
                     style = { ['text-align'] = 'center' }
                 })
                 ConfirmPage:RegisterElement('button', {
-                    label = _U('checks_button'),
+                    label = Feather.Locale.translateUpper('checks_button'),
                     style = {}
                 }, function()
-                    exports['feather-core']:CallRPCAsync('Feather:Banks:CashCheck', { check_id = check.id })
+                    exports['feather-core']:CallRPCAsync('bcc-banks:CashCheck', { check_id = check.id })
                     OpenCashCheckPage(bank, ParentPage)
                 end)
                 ConfirmPage:RegisterElement('line', { slot = 'footer', style = {} })
                 ConfirmPage:RegisterElement('button', {
-                    label = _U('back_button'),
+                    label = Feather.Locale.translateUpper('back_button'),
                     slot  = 'footer',
                     style = {}
                 }, function()
@@ -266,7 +266,7 @@ function OpenCashCheckPage(bank, ParentPage)
 
     CashPage:RegisterElement('line', { slot = 'footer', style = {} })
     CashPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()

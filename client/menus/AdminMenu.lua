@@ -52,9 +52,9 @@ local function adminTransactionBadgeColor(txType)
 end
 
 function OpenBankAdminMenu()
-    local ok, allowed = exports['feather-core']:CallRPCAsync("Feather:Banks:CheckAdmin", {})
+    local ok, allowed = exports['feather-core']:CallRPCAsync("bcc-banks:CheckAdmin", {})
     if not ok or not allowed then
-        Notify(_U("admin_no_permission"), "error", 3500)
+        Notify(Feather.Locale.translateUpper("admin_no_permission"), "error", 3500)
         return
     end
 
@@ -66,11 +66,11 @@ function OpenAdminBankSelectMenu()
     local Page = FeatherBankMenu:RegisterPage("bank:page:admin:banks")
 
     Page:RegisterElement("header", {
-        value = _U("admin_header"),
+        value = Feather.Locale.translateUpper("admin_header"),
         slot  = "header"
     })
     Page:RegisterElement("subheader", {
-        value = _U("admin_subheader"),
+        value = Feather.Locale.translateUpper("admin_subheader"),
         slot  = "header"
     })
     Page:RegisterElement("line", {
@@ -78,23 +78,23 @@ function OpenAdminBankSelectMenu()
         style = {}
     })
 
-    local ok, banks = exports['feather-core']:CallRPCAsync("Feather:Banks:GetBanks", {})
+    local ok, banks = exports['feather-core']:CallRPCAsync("bcc-banks:GetBanks", {})
     banks = banks or {}
     if not ok or #banks == 0 then
         Page:RegisterElement("textdisplay", {
-            value = _U("admin_no_banks_found"),
+            value = Feather.Locale.translateUpper("admin_no_banks_found"),
             slot  = "content"
         })
     end
 
     -- Always allow creating a bank from here
     Page:RegisterElement("button", {
-        label = _U("admin_create_bank_here"),
+        label = Feather.Locale.translateUpper("admin_create_bank_here"),
         style = {}
     }, function()
         local CreatePage = FeatherBankMenu:RegisterPage("bank:page:admin:banks:create")
         CreatePage:RegisterElement("header", {
-            value = _U("admin_create_bank_header"),
+            value = Feather.Locale.translateUpper("admin_create_bank_header"),
             slot  = "header"
         })
         CreatePage:RegisterElement("line", {
@@ -103,17 +103,17 @@ function OpenAdminBankSelectMenu()
         })
         local nameValue = ""
         CreatePage:RegisterElement("input", {
-            label       = _U("admin_bank_name_label"),
-            placeholder = _U("admin_bank_name_placeholder"),
+            label       = Feather.Locale.translateUpper("admin_bank_name_label"),
+            placeholder = Feather.Locale.translateUpper("admin_bank_name_placeholder"),
             style       = {}
         }, function(data)
             nameValue = data.value
         end)
         CreatePage:RegisterElement("button", {
-            label = _U("confirm_button"),
+            label = Feather.Locale.translateUpper("confirm_button"),
             style = {}
         }, function()
-            local okC = exports['feather-core']:CallRPCAsync("Feather:Banks:CreateBank", { name = nameValue })
+            local okC = exports['feather-core']:CallRPCAsync("bcc-banks:CreateBank", { name = nameValue })
             if okC then
                 OpenAdminBankSelectMenu()
             end
@@ -123,7 +123,7 @@ function OpenAdminBankSelectMenu()
             style = {}
         })
         CreatePage:RegisterElement("button", {
-            label = _U("back_button"),
+            label = Feather.Locale.translateUpper("back_button"),
             slot  = "footer",
             style = {}
         }, function()
@@ -153,7 +153,7 @@ function OpenAdminBankSelectMenu()
         style = {}
     })
     Page:RegisterElement("button", {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -171,7 +171,7 @@ function OpenAdminBankHub(bank, Parent)
     local Hub = FeatherBankMenu:RegisterPage("bank:page:admin:bank:" .. tostring(bank.id))
 
     Hub:RegisterElement("header", {
-        value = _U("admin_header"),
+        value = Feather.Locale.translateUpper("admin_header"),
         slot  = "header"
     })
     Hub:RegisterElement("subheader", {
@@ -184,37 +184,37 @@ function OpenAdminBankHub(bank, Parent)
     })
 
     Hub:RegisterElement("button", {
-        label = _U("admin_manage_rates_button"),
+        label = Feather.Locale.translateUpper("admin_manage_rates_button"),
         style = {}
     }, function()
         OpenAdminRatesMenu(Hub, bank)
     end)
     Hub:RegisterElement("button", {
-        label = _U("admin_view_accounts_button"),
+        label = Feather.Locale.translateUpper("admin_view_accounts_button"),
         style = {}
     }, function()
         OpenAdminAccountsMenu(Hub, bank)
     end)
     Hub:RegisterElement("button", {
-        label = _U("admin_view_locked_accounts_button"),
+        label = Feather.Locale.translateUpper("admin_view_locked_accounts_button"),
         style = {}
     }, function()
         OpenAdminLockedAccountsMenu(Hub, bank)
     end)
     Hub:RegisterElement("button", {
-        label = _U("admin_view_loans_button"),
+        label = Feather.Locale.translateUpper("admin_view_loans_button"),
         style = {}
     }, function()
         OpenAdminLoansMenu(Hub, bank)
     end)
     Hub:RegisterElement("button", {
-        label = _U("admin_view_sdbs_button"),
+        label = Feather.Locale.translateUpper("admin_view_sdbs_button"),
         style = {}
     }, function()
         OpenAdminSDBsMenu(Hub, bank)
     end)
     Hub:RegisterElement("button", {
-        label = _U("admin_manage_hours_button") or "Manage Hours",
+        label = Feather.Locale.translateUpper("admin_manage_hours_button") or "Manage Hours",
         style = {}
     }, function()
         OpenAdminHoursMenu(Hub, bank)
@@ -225,7 +225,7 @@ function OpenAdminBankHub(bank, Parent)
         style = {}
     })
     Hub:RegisterElement("button", {
-        label = _U("back_button"),
+        label = Feather.Locale.translateUpper("back_button"),
         slot  = "footer",
         style = {}
     }, function()
@@ -241,11 +241,11 @@ end
 function OpenAdminHoursMenu(Parent, bank)
     local Page = FeatherBankMenu:RegisterPage('bank:page:admin:hours')
     Page:RegisterElement('header', {
-        value = _U('admin_hours_header') or 'Hours',
+        value = Feather.Locale.translateUpper('admin_hours_header') or 'Hours',
         slot = 'header'
     })
     Page:RegisterElement('subheader', {
-        value = _U('admin_hours_subheader') or 'Configure opening hours',
+        value = Feather.Locale.translateUpper('admin_hours_subheader') or 'Configure opening hours',
         slot = 'header'
     })
     Page:RegisterElement('line', {
@@ -259,15 +259,15 @@ function OpenAdminHoursMenu(Parent, bank)
 
     if not bank then
         Page:RegisterElement('input', {
-            label = _U('admin_bank_id_label'),
-            placeholder = _U('admin_bank_id_placeholder'),
+            label = Feather.Locale.translateUpper('admin_bank_id_label'),
+            placeholder = Feather.Locale.translateUpper('admin_bank_id_placeholder'),
             style = {}
         }, function(data)
             bankIdValue = data.value
         end)
     else
         Page:RegisterElement('textdisplay', {
-        value = _U('bank_label') .. ': ' .. tostring(bank.name),
+        value = Feather.Locale.translateUpper('bank_label') .. ': ' .. tostring(bank.name),
             slot = 'content'
         })
     end
@@ -275,13 +275,13 @@ function OpenAdminHoursMenu(Parent, bank)
     do
         local bankId = NormalizeId(bankIdValue) or (bank and NormalizeId(bank.id))
         if bankId then
-            local ok, data = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetHours', { bank = bankId })
+            local ok, data = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:GetHours', { bank = bankId })
             if ok and data then
                 hoursActive = data.hours_active and true or false
                 openVal = tostring(data.open_hour or '')
                 closeVal = tostring(data.close_hour or '')
-                local status = hoursActive and (_U('admin_hours_active_yes') or 'Hours Active: Yes') or
-                (_U('admin_hours_active_no') or 'Hours Active: No')
+                local status = hoursActive and (Feather.Locale.translateUpper('admin_hours_active_yes') or 'Hours Active: Yes') or
+                (Feather.Locale.translateUpper('admin_hours_active_no') or 'Hours Active: No')
                 local info = status .. ' | Open: ' .. (openVal ~= '' and openVal or '—') .. ' | Close: ' .. (closeVal ~= '' and closeVal or '—')
                 Page:RegisterElement('textdisplay', {
                     value = info,
@@ -292,51 +292,51 @@ function OpenAdminHoursMenu(Parent, bank)
     end
 
     Page:RegisterElement('toggle', {
-        label = _U('admin_manage_hours_button') or 'Manage Hours',
+        label = Feather.Locale.translateUpper('admin_manage_hours_button') or 'Manage Hours',
         start = hoursActive,
         slot = 'content',
     }, function(data)
         local bankId = NormalizeId(bankIdValue) or (bank and NormalizeId(bank.id))
         if not bankId then
-            Notify(_U('admin_invalid_bank_id'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_bank_id'), 3000)
             return
         end
-        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ToggleHours',
+        local ok = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ToggleHours',
             { bank = bankId, active = data.value and true or false })
         Notify(
         ok and
-        (data.value and (_U('admin_hours_enabled') or 'Hours enabled.') or (_U('admin_hours_disabled') or 'Hours disabled.')) or
-        _U('admin_action_failed'), ok and 'success' or 'error', 3500)
+        (data.value and (Feather.Locale.translateUpper('admin_hours_enabled') or 'Hours enabled.') or (Feather.Locale.translateUpper('admin_hours_disabled') or 'Hours disabled.')) or
+        Feather.Locale.translateUpper('admin_action_failed'), ok and 'success' or 'error', 3500)
     end)
 
     -- Inputs for open/close with placeholders showing current
     Page:RegisterElement('input', {
-        label = _U('admin_open_hour_label') or 'Open Hour (0-23)',
+        label = Feather.Locale.translateUpper('admin_open_hour_label') or 'Open Hour (0-23)',
         placeholder = (openVal ~= '' and openVal or '7'),
         style = {}
     }, function(data)
         openVal = data.value
     end)
     Page:RegisterElement('input', {
-        label = _U('admin_close_hour_label') or 'Close Hour (0-23)',
+        label = Feather.Locale.translateUpper('admin_close_hour_label') or 'Close Hour (0-23)',
         placeholder = (closeVal ~= '' and closeVal or '21'),
         style = {}
     }, function(data)
         closeVal = data.value
     end)
     Page:RegisterElement('button', {
-        label = _U('admin_set_hours_button') or 'Set Hours',
+        label = Feather.Locale.translateUpper('admin_set_hours_button') or 'Set Hours',
         style = {}
     }, function()
         local bankId = NormalizeId(bankIdValue) or (bank and NormalizeId(bank.id))
         local openH = tonumber(openVal)
         local closeH = tonumber(closeVal)
         if not bankId or openH == nil or closeH == nil then
-            Notify(_U('admin_invalid_hours_input') or 'Enter valid bank/hours', 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_hours_input') or 'Enter valid bank/hours', 3000)
             return
         end
-        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetHours', { bank = bankId, open = openH, close = closeH })
-        Notify(ok and (_U('admin_hours_updated') or 'Hours updated.') or _U('admin_action_failed'),
+        local ok = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:SetHours', { bank = bankId, open = openH, close = closeH })
+        Notify(ok and (Feather.Locale.translateUpper('admin_hours_updated') or 'Hours updated.') or Feather.Locale.translateUpper('admin_action_failed'),
             ok and 'success' or 'error', 3500)
     end)
 
@@ -345,7 +345,7 @@ function OpenAdminHoursMenu(Parent, bank)
         style = {}
     })
     Page:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot = 'footer',
         style = {}
     }, function()
@@ -361,11 +361,11 @@ end
 function OpenAdminRatesMenu(Parent, bank)
     local AdminRatesPage = FeatherBankMenu:RegisterPage('bank:page:admin:rates')
     AdminRatesPage:RegisterElement('header', {
-        value = _U('admin_rates_header'),
+        value = Feather.Locale.translateUpper('admin_rates_header'),
         slot  = 'header'
     })
     AdminRatesPage:RegisterElement('subheader', {
-        value = _U('admin_rates_subheader'),
+        value = Feather.Locale.translateUpper('admin_rates_subheader'),
         slot  = 'header'
     })
     AdminRatesPage:RegisterElement('line', {
@@ -376,52 +376,52 @@ function OpenAdminRatesMenu(Parent, bank)
     local bankIdValue, newRateValue = bank and tostring(bank.id) or '', ''
     if not bank then
         AdminRatesPage:RegisterElement('input', {
-            label       = _U('admin_bank_id_label'),
-            placeholder = _U('admin_bank_id_placeholder'),
+            label       = Feather.Locale.translateUpper('admin_bank_id_label'),
+            placeholder = Feather.Locale.translateUpper('admin_bank_id_placeholder'),
             style       = {}
         }, function(data)
             bankIdValue = data.value
         end)
     else
         AdminRatesPage:RegisterElement('textdisplay', {
-        value = _U('bank_label') .. ': ' .. tostring(bank.name),
+        value = Feather.Locale.translateUpper('bank_label') .. ': ' .. tostring(bank.name),
             slot = 'content'
         })
     end
     AdminRatesPage:RegisterElement('button', {
-        label = _U('admin_get_bank_rate_button'),
+        label = Feather.Locale.translateUpper('admin_get_bank_rate_button'),
         style = {}
     }, function()
         local bankId = NormalizeId(bankIdValue)
         if not bankId then
-            Notify(_U('admin_invalid_bank_id'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_bank_id'), 3000)
             return
         end
-        local ok, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetBankRate', { bank = bankId })
+        local ok, rate = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:GetBankRate', { bank = bankId })
         local msg = ok and
-        (_U('admin_current_rate') .. ' ' .. (rate and toFixed(rate, 2) .. '%' or _U('admin_rate_not_set'))) or
-        _U('admin_action_failed')
+        (Feather.Locale.translateUpper('admin_current_rate') .. ' ' .. (rate and toFixed(rate, 2) .. '%' or Feather.Locale.translateUpper('admin_rate_not_set'))) or
+        Feather.Locale.translateUpper('admin_action_failed')
         Notify(msg, ok and 'success' or 'error', 3500)
     end)
     AdminRatesPage:RegisterElement('input', {
-        label       = _U('admin_new_rate_label'),
-        placeholder = _U('admin_new_rate_placeholder'),
+        label       = Feather.Locale.translateUpper('admin_new_rate_label'),
+        placeholder = Feather.Locale.translateUpper('admin_new_rate_placeholder'),
         style       = {}
     }, function(data)
         newRateValue = data.value
     end)
     AdminRatesPage:RegisterElement('button', {
-        label = _U('admin_set_bank_rate_button'),
+        label = Feather.Locale.translateUpper('admin_set_bank_rate_button'),
         style = {}
     }, function()
         local bankId = NormalizeId(bankIdValue)
         local rate = tonumber(newRateValue)
         if not bankId or not rate then
-            Notify(_U('admin_invalid_input'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_input'), 3000)
             return
         end
-        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetBankRate', { bank = bankId, rate = rate })
-        Notify(ok and _U('admin_rate_updated') or _U('admin_action_failed'), ok and 'success' or 'error', 3500)
+        local ok = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:SetBankRate', { bank = bankId, rate = rate })
+        Notify(ok and Feather.Locale.translateUpper('admin_rate_updated') or Feather.Locale.translateUpper('admin_action_failed'), ok and 'success' or 'error', 3500)
     end)
 
     AdminRatesPage:RegisterElement('line', {
@@ -429,7 +429,7 @@ function OpenAdminRatesMenu(Parent, bank)
     })
 
     AdminRatesPage:RegisterElement('button', {
-        label = _U('admin_manage_char_rates_button'),
+        label = Feather.Locale.translateUpper('admin_manage_char_rates_button'),
         style = {}
     }, function()
         OpenAdminCharRatesMenu(AdminRatesPage)
@@ -440,7 +440,7 @@ function OpenAdminRatesMenu(Parent, bank)
         style = {}
     })
     AdminRatesPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -456,11 +456,11 @@ end
 function OpenAdminCharRatesMenu(Parent)
     local AdminCharRatesPage = FeatherBankMenu:RegisterPage('bank:page:admin:char:rates')
     AdminCharRatesPage:RegisterElement('header', {
-        value = _U('admin_char_rates_header'),
+        value = Feather.Locale.translateUpper('admin_char_rates_header'),
         slot  = 'header'
     })
     AdminCharRatesPage:RegisterElement('subheader', {
-        value = _U('admin_char_rates_subheader'),
+        value = Feather.Locale.translateUpper('admin_char_rates_subheader'),
         slot  = 'header'
     })
     AdminCharRatesPage:RegisterElement('line', {
@@ -470,66 +470,66 @@ function OpenAdminCharRatesMenu(Parent)
 
     local charIdValue, bankIdValue, newRateValue = '', '', ''
     AdminCharRatesPage:RegisterElement('input', {
-        label       = _U('admin_char_id_label'),
-        placeholder = _U('admin_char_id_placeholder'),
+        label       = Feather.Locale.translateUpper('admin_char_id_label'),
+        placeholder = Feather.Locale.translateUpper('admin_char_id_placeholder'),
         style       = {}
     }, function(data)
         charIdValue = data.value
     end)
     AdminCharRatesPage:RegisterElement('input', {
-        label       = _U('admin_bank_id_label'),
-        placeholder = _U('admin_bank_id_char_placeholder'),
+        label       = Feather.Locale.translateUpper('admin_bank_id_label'),
+        placeholder = Feather.Locale.translateUpper('admin_bank_id_char_placeholder'),
         style       = {}
     }, function(data)
         bankIdValue = data.value
     end)
     AdminCharRatesPage:RegisterElement('button', {
-        label = _U('admin_get_char_rate_button'),
+        label = Feather.Locale.translateUpper('admin_get_char_rate_button'),
         style = {}
     }, function()
         local charId = tonumber(charIdValue)
         if not charId then
-            Notify(_U('admin_invalid_char_id'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_char_id'), 3000)
             return
         end
-        local ok, rate = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetCharRate', { char = charId, bank = bankIdValue })
+        local ok, rate = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:GetCharRate', { char = charId, bank = bankIdValue })
         local msg = ok and
-        (_U('admin_current_rate') .. ' ' .. (rate and toFixed(rate, 2) .. '%' or _U('admin_rate_not_set'))) or
-        _U('admin_action_failed')
+        (Feather.Locale.translateUpper('admin_current_rate') .. ' ' .. (rate and toFixed(rate, 2) .. '%' or Feather.Locale.translateUpper('admin_rate_not_set'))) or
+        Feather.Locale.translateUpper('admin_action_failed')
         Notify(msg, ok and 'success' or 'error', 3500)
     end)
     AdminCharRatesPage:RegisterElement('input', {
-        label       = _U('admin_new_rate_label'),
-        placeholder = _U('admin_new_rate_placeholder'),
+        label       = Feather.Locale.translateUpper('admin_new_rate_label'),
+        placeholder = Feather.Locale.translateUpper('admin_new_rate_placeholder'),
         style       = {}
     }, function(data)
         newRateValue = data.value
     end)
     AdminCharRatesPage:RegisterElement('button', {
-        label = _U('admin_set_char_rate_button'),
+        label = Feather.Locale.translateUpper('admin_set_char_rate_button'),
         style = {}
     }, function()
         local charId = tonumber(charIdValue)
         local rate = tonumber(newRateValue)
         if not charId or not rate then
-            Notify(_U('admin_invalid_input'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_input'), 3000)
             return
         end
-        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetCharRate',
+        local ok = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:SetCharRate',
             { char = charId, bank = bankIdValue, rate = rate })
-        Notify(ok and _U('admin_rate_updated') or _U('admin_action_failed'), ok and 'success' or 'error', 3500)
+        Notify(ok and Feather.Locale.translateUpper('admin_rate_updated') or Feather.Locale.translateUpper('admin_action_failed'), ok and 'success' or 'error', 3500)
     end)
     AdminCharRatesPage:RegisterElement('button', {
-        label = _U('admin_clear_char_rate_button'),
+        label = Feather.Locale.translateUpper('admin_clear_char_rate_button'),
         style = {}
     }, function()
         local charId = tonumber(charIdValue)
         if not charId then
-            Notify(_U('admin_invalid_char_id'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_char_id'), 3000)
             return
         end
-        local ok = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ClearCharRate', { char = charId, bank = bankIdValue })
-        Notify(ok and _U('admin_rate_cleared') or _U('admin_action_failed'), ok and 'success' or 'error', 3500)
+        local ok = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ClearCharRate', { char = charId, bank = bankIdValue })
+        Notify(ok and Feather.Locale.translateUpper('admin_rate_cleared') or Feather.Locale.translateUpper('admin_action_failed'), ok and 'success' or 'error', 3500)
     end)
 
     AdminCharRatesPage:RegisterElement('line', {
@@ -537,7 +537,7 @@ function OpenAdminCharRatesMenu(Parent)
         style = {}
     })
     AdminCharRatesPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -564,7 +564,7 @@ local function renderTable(list, columns)
     if #rows == 0 then
         local span = tostring(#(columns or {}))
         if span == '0' then span = '1' end
-        local emptyMsg = _U('no_loans_found') or 'No loans found.'
+        local emptyMsg = Feather.Locale.translateUpper('no_loans_found') or 'No loans found.'
         html = html .. '<tr><td style="padding:8px 6px; text-align:center;" colspan="' .. span .. '">' .. emptyMsg .. '</td></tr>'
     else
         for _, row in ipairs(rows) do
@@ -596,7 +596,7 @@ local function formatAccountCell(row)
     if accId and accId ~= '' then
         return '#' .. tostring(accId)
     end
-    return _U('unknown') or 'Unknown'
+    return Feather.Locale.translateUpper('unknown') or 'Unknown'
 end
 
 local function formatBorrowerCell(row)
@@ -616,7 +616,7 @@ local function formatBorrowerCell(row)
             fullName = trimmedLast
         end
     else
-        fullName = _U('unknown') or 'Unknown'
+        fullName = Feather.Locale.translateUpper('unknown') or 'Unknown'
     end
     local charId = row.character_id and tostring(row.character_id) or ''
     if charId ~= '' then
@@ -636,7 +636,7 @@ local function openAdminLoanDetails(loan, ParentPage, bank, AdminParentPage)
     local detailPage = FeatherBankMenu:RegisterPage('bank:page:admin:loan:' .. loanId)
 
     detailPage:RegisterElement('header', {
-        value = _U('admin_loan_header', loanId) or ('Loan #' .. loanId),
+        value = Feather.Locale.translateUpper('admin_loan_header', loanId) or ('Loan #' .. loanId),
         slot  = 'header'
     })
 
@@ -661,15 +661,15 @@ local function openAdminLoanDetails(loan, ParentPage, bank, AdminParentPage)
 
     local infoHtml = [[
         <div style="padding:12px;">
-            <div><b>]] .. (_U('admin_table_owner') or 'Owner') .. [[</b> ]] .. borrowerSummary .. [[</div>
-            <div><b>]] .. (_U('admin_table_account') or 'Account') .. [[</b> ]] .. formatAccountCell(loan) .. [[</div>
-            <div><b>]] .. (_U('loan_amount_label') or 'Loan Amount') .. [[</b> $]] .. amountValue .. [[</div>
-            <div><b>]] .. (_U('admin_table_interest') or 'Interest') .. [[</b> ]] .. toFixed(loan.interest, 2) .. [[%</div>
-            <div><b>]] .. (_U('admin_table_duration') or 'Duration') .. [[</b> ]] .. tostring(loan.duration or '-') .. ' ' .. ((_U('admin_months_short') or 'months')) .. [[</div>
-            <div><b>]] .. (_U('repaid_label') or 'Repaid:') .. [[</b> $]] .. totalRepaid .. [[</div>
-            <div><b>]] .. (_U('outstanding_label') or 'Outstanding:') .. [[</b> $]] .. totalOutstanding .. [[</div>
-            <div><b>]] .. (_U('total_due_label') or 'Total Due:') .. [[</b> $]] .. totalDue .. [[</div>
-            <div><b>]] .. (_U('admin_table_created') or 'Created') .. [[</b> ]] .. createdDisplay .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('admin_table_owner') or 'Owner') .. [[</b> ]] .. borrowerSummary .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('admin_table_account') or 'Account') .. [[</b> ]] .. formatAccountCell(loan) .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('loan_amount_label') or 'Loan Amount') .. [[</b> $]] .. amountValue .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('admin_table_interest') or 'Interest') .. [[</b> ]] .. toFixed(loan.interest, 2) .. [[%</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('admin_table_duration') or 'Duration') .. [[</b> ]] .. tostring(loan.duration or '-') .. ' ' .. ((Feather.Locale.translateUpper('admin_months_short') or 'months')) .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('repaid_label') or 'Repaid:') .. [[</b> $]] .. totalRepaid .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('outstanding_label') or 'Outstanding:') .. [[</b> $]] .. totalOutstanding .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('total_due_label') or 'Total Due:') .. [[</b> $]] .. totalDue .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('admin_table_created') or 'Created') .. [[</b> ]] .. createdDisplay .. [[</div>
             <div><b>Status</b> ]] .. (loan.status or 'pending') .. [[</div>
         </div>
     ]]
@@ -686,22 +686,22 @@ local function openAdminLoanDetails(loan, ParentPage, bank, AdminParentPage)
 
     if tostring(loan.status) == 'pending' then
         detailPage:RegisterElement('button', {
-            label = _U('admin_approve_button') or 'Approve',
+            label = Feather.Locale.translateUpper('admin_approve_button') or 'Approve',
             style = {}
         }, function()
-            local okA = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ApproveLoan', { loan = NormalizeId(loanId) })
+            local okA = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ApproveLoan', { loan = NormalizeId(loanId) })
             if okA then
-                Notify(_U('admin_approved_notify') or 'Approved', 2500)
+                Notify(Feather.Locale.translateUpper('admin_approved_notify') or 'Approved', 2500)
             end
             OpenAdminLoansMenu(AdminParentPage or ParentPage, bank)
         end)
         detailPage:RegisterElement('button', {
-            label = _U('admin_reject_button') or 'Reject',
+            label = Feather.Locale.translateUpper('admin_reject_button') or 'Reject',
             style = {}
         }, function()
-            local okR = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:RejectLoan', { loan = NormalizeId(loanId) })
+            local okR = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:RejectLoan', { loan = NormalizeId(loanId) })
             if okR then
-                Notify(_U('admin_rejected_notify') or 'Rejected', 2500)
+                Notify(Feather.Locale.translateUpper('admin_rejected_notify') or 'Rejected', 2500)
             end
             OpenAdminLoansMenu(AdminParentPage or ParentPage, bank)
         end)
@@ -713,7 +713,7 @@ local function openAdminLoanDetails(loan, ParentPage, bank, AdminParentPage)
     })
 
     detailPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -735,7 +735,7 @@ local function renderLoanButtons(page, loans, bank, AdminParentPage)
         local borrowerLabel = formatBorrowerCell(loan)
         local amountText = toFixed(loan.amount, 2)
         local repaidText = toFixed(loan.total_repaid or loan.totalRepaid or 0, 2)
-        local label = borrowerLabel .. ' — $' .. amountText .. ' | ' .. (_U('repaid_label') or 'Repaid:') .. ' $' .. repaidText
+        local label = borrowerLabel .. ' — $' .. amountText .. ' | ' .. (Feather.Locale.translateUpper('repaid_label') or 'Repaid:') .. ' $' .. repaidText
         page:RegisterElement('button', {
             label = label,
             style = {}
@@ -748,11 +748,11 @@ end
 function OpenAdminAccountsMenu(Parent, bank)
     local AdminAccountsPage = FeatherBankMenu:RegisterPage('bank:page:admin:accounts')
     AdminAccountsPage:RegisterElement('header', {
-        value = _U('admin_accounts_header'),
+        value = Feather.Locale.translateUpper('admin_accounts_header'),
         slot  = 'header'
     })
     AdminAccountsPage:RegisterElement('subheader', {
-        value = _U('admin_accounts_subheader'),
+        value = Feather.Locale.translateUpper('admin_accounts_subheader'),
         slot  = 'header'
     })
     AdminAccountsPage:RegisterElement('line', {
@@ -765,9 +765,9 @@ function OpenAdminAccountsMenu(Parent, bank)
     -- Helper: fetch and render accounts as buttons (Owner — Account)
     local function renderAccountsList(bankId)
         if not bankId then return end
-        local ok, rows = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListAccounts', { bank = bankId })
+        local ok, rows = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ListAccounts', { bank = bankId })
         if not ok then
-            Notify(_U('admin_action_failed'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_action_failed'), 3000)
             return
         end
 
@@ -778,15 +778,15 @@ function OpenAdminAccountsMenu(Parent, bank)
 
         if not rows or #rows == 0 then
             AdminAccountsPage:RegisterElement('textdisplay', {
-                value = _U('no_accounts_found'),
+                value = Feather.Locale.translateUpper('no_accounts_found'),
                 slot  = 'content'
             })
         else
             for _, r in ipairs(rows or {}) do
                 local first    = (r.owner_firstname and tostring(r.owner_firstname)) or ''
                 local last     = (r.owner_lastname and tostring(r.owner_lastname)) or ''
-                local fullName = (first ~= '' or last ~= '') and (first .. ' ' .. last) or (_U('unknown') or 'Unknown')
-                local accName  = (r.name and tostring(r.name)) or (_U('bank_accounts_header') or 'Account')
+                local fullName = (first ~= '' or last ~= '') and (first .. ' ' .. last) or (Feather.Locale.translateUpper('unknown') or 'Unknown')
+                local accName  = (r.name and tostring(r.name)) or (Feather.Locale.translateUpper('bank_accounts_header') or 'Account')
                 local label    = fullName .. ' — ' .. accName
 
                 AdminAccountsPage:RegisterElement('button', {
@@ -802,8 +802,8 @@ function OpenAdminAccountsMenu(Parent, bank)
     end
     if not bank then
         AdminAccountsPage:RegisterElement('input', {
-            label       = _U('admin_bank_id_label'),
-            placeholder = _U('admin_bank_id_placeholder'),
+            label       = Feather.Locale.translateUpper('admin_bank_id_label'),
+            placeholder = Feather.Locale.translateUpper('admin_bank_id_placeholder'),
             style       = {}
         }, function(data)
             bankIdValue = data.value
@@ -814,7 +814,7 @@ function OpenAdminAccountsMenu(Parent, bank)
         end)
     else
         AdminAccountsPage:RegisterElement('textdisplay', {
-        value = _U('bank_label') .. ': ' .. tostring(bank.name),
+        value = Feather.Locale.translateUpper('bank_label') .. ': ' .. tostring(bank.name),
             slot = 'content'
         })
     end
@@ -831,7 +831,7 @@ function OpenAdminAccountsMenu(Parent, bank)
         style = {}
     })
     AdminAccountsPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -849,11 +849,11 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
     local LockedAccountsPage = FeatherBankMenu:RegisterPage(pageId)
 
     LockedAccountsPage:RegisterElement('header', {
-        value = _U('admin_locked_accounts_header'),
+        value = Feather.Locale.translateUpper('admin_locked_accounts_header'),
         slot  = 'header'
     })
     LockedAccountsPage:RegisterElement('subheader', {
-        value = _U('admin_locked_accounts_subheader'),
+        value = Feather.Locale.translateUpper('admin_locked_accounts_subheader'),
         slot  = 'header'
     })
     LockedAccountsPage:RegisterElement('line', {
@@ -866,9 +866,9 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
     local function renderLockedList(bankId)
         if not bankId then return end
 
-        local ok, rows = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListFrozenAccounts', { bank = bankId })
+        local ok, rows = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ListFrozenAccounts', { bank = bankId })
         if not ok then
-            Notify(_U('admin_action_failed'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_action_failed'), 3000)
             return
         end
 
@@ -879,7 +879,7 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
 
         if not rows or #rows == 0 then
             LockedAccountsPage:RegisterElement('textdisplay', {
-                value = _U('admin_locked_accounts_empty'),
+                value = Feather.Locale.translateUpper('admin_locked_accounts_empty'),
                 slot  = 'content'
             })
             return
@@ -889,12 +889,12 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
             local accData = row
             local first    = (accData.owner_firstname and tostring(accData.owner_firstname)) or ''
             local last     = (accData.owner_lastname and tostring(accData.owner_lastname)) or ''
-            local fullName = (first ~= '' or last ~= '') and (first .. ' ' .. last) or (_U('unknown') or 'Unknown')
-            local accName  = (accData.name and tostring(accData.name)) or (_U('bank_accounts_header') or 'Account')
+            local fullName = (first ~= '' or last ~= '') and (first .. ' ' .. last) or (Feather.Locale.translateUpper('unknown') or 'Unknown')
+            local accName  = (accData.name and tostring(accData.name)) or (Feather.Locale.translateUpper('bank_accounts_header') or 'Account')
             local charId   = accData.owner_id and tostring(accData.owner_id) or '—'
             local accNum   = accData.account_number and tostring(accData.account_number) or '—'
-            local charLabel = ((_U('character_id_label') or 'Character ID'):gsub(':', ''))
-            local accNumLabel = ((_U('account_number_label') or 'Account number'):gsub(':', ''))
+            local charLabel = ((Feather.Locale.translateUpper('character_id_label') or 'Character ID'):gsub(':', ''))
+            local accNumLabel = ((Feather.Locale.translateUpper('account_number_label') or 'Account number'):gsub(':', ''))
             local header = string.format('%s — %s (#%s)', fullName, accName, tostring(accData.id or ''))
             local details = string.format('%s: %s | %s: %s', charLabel, charId, accNumLabel, accNum)
 
@@ -903,15 +903,15 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
                 slot  = 'content'
             })
             LockedAccountsPage:RegisterElement('button', {
-                label = _U('admin_unlock_account_button'),
+                label = Feather.Locale.translateUpper('admin_unlock_account_button'),
                 style = {}
             }, function()
-                local okUnlock = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetAccountFrozen', {
+                local okUnlock = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:SetAccountFrozen', {
                     account = tostring(accData.id),
                     frozen = false
                 })
-                Notify(okUnlock and (_U('admin_unlock_account_success') or 'Account unlocked.') or
-                    (_U('admin_unlock_account_failed') or 'Failed to unlock account.'),
+                Notify(okUnlock and (Feather.Locale.translateUpper('admin_unlock_account_success') or 'Account unlocked.') or
+                    (Feather.Locale.translateUpper('admin_unlock_account_failed') or 'Failed to unlock account.'),
                     okUnlock and 'success' or 'error', 3500)
                 if okUnlock then
                     OpenAdminLockedAccountsMenu(Parent, bank)
@@ -926,8 +926,8 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
 
     if not bank then
         LockedAccountsPage:RegisterElement('input', {
-            label       = _U('admin_bank_id_label'),
-            placeholder = _U('admin_bank_id_placeholder'),
+            label       = Feather.Locale.translateUpper('admin_bank_id_label'),
+            placeholder = Feather.Locale.translateUpper('admin_bank_id_placeholder'),
             style       = {}
         }, function(data)
             bankIdValue = data.value
@@ -938,7 +938,7 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
         end)
     else
         LockedAccountsPage:RegisterElement('textdisplay', {
-        value = _U('bank_label') .. ': ' .. tostring(bank.name),
+        value = Feather.Locale.translateUpper('bank_label') .. ': ' .. tostring(bank.name),
             slot  = 'content'
         })
     end
@@ -953,7 +953,7 @@ function OpenAdminLockedAccountsMenu(Parent, bank)
         style = {}
     })
     LockedAccountsPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -973,11 +973,11 @@ function OpenAdminAccountTransactionsPage(acc, transactions, ParentPage)
     local Page = FeatherBankMenu:RegisterPage('bank:page:admin:account:transactions:' .. tostring(acc.id) .. ':' .. tostring(GetGameTimer()))
 
     Page:RegisterElement('header', {
-        value = _U('transactions_header') or 'Transactions',
+        value = Feather.Locale.translateUpper('transactions_header') or 'Transactions',
         slot = 'header'
     })
     Page:RegisterElement('subheader', {
-        value = _U('transactions_subheader', tostring(accountNumber)) or ('Recent activity for account #' .. tostring(accountNumber)),
+        value = Feather.Locale.translateUpper('transactions_subheader', tostring(accountNumber)) or ('Recent activity for account #' .. tostring(accountNumber)),
         slot = 'header'
     })
     Page:RegisterElement('line', {
@@ -988,7 +988,7 @@ function OpenAdminAccountTransactionsPage(acc, transactions, ParentPage)
     transactions = transactions or {}
     if #transactions == 0 then
         Page:RegisterElement('textdisplay', {
-            value = _U('no_transactions_found') or 'No transactions found.',
+            value = Feather.Locale.translateUpper('no_transactions_found') or 'No transactions found.',
             slot = 'content'
         })
     else
@@ -997,12 +997,12 @@ function OpenAdminAccountTransactionsPage(acc, transactions, ParentPage)
               <table style="width:100%; border-collapse:collapse; font-size:14px;">
                 <thead>
                   <tr style="background:#f1f3f5; color:#212529;">
-                    <th style="text-align:left; padding:8px 6px; width:10%">]] .. (_U('transaction_id') or 'ID') .. [[</th>
-                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. (_U('transaction_when') or 'When') .. [[</th>
-                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. (_U('transaction_by') or 'By') .. [[</th>
-                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. (_U('transaction_type') or 'Type') .. [[</th>
-                    <th style="text-align:right; padding:8px 6px; width:18%">]] .. (_U('transaction_amount') or 'Amount') .. [[</th>
-                    <th style="text-align:left; padding:8px 6px;">]] .. (_U('transaction_description') or 'Description') .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:10%">]] .. (Feather.Locale.translateUpper('transaction_id') or 'ID') .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. (Feather.Locale.translateUpper('transaction_when') or 'When') .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. (Feather.Locale.translateUpper('transaction_by') or 'By') .. [[</th>
+                    <th style="text-align:left; padding:8px 6px; width:18%">]] .. (Feather.Locale.translateUpper('transaction_type') or 'Type') .. [[</th>
+                    <th style="text-align:right; padding:8px 6px; width:18%">]] .. (Feather.Locale.translateUpper('transaction_amount') or 'Amount') .. [[</th>
+                    <th style="text-align:left; padding:8px 6px;">]] .. (Feather.Locale.translateUpper('transaction_description') or 'Description') .. [[</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1039,7 +1039,7 @@ function OpenAdminAccountTransactionsPage(acc, transactions, ParentPage)
         style = {}
     })
     Page:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot = 'footer',
         style = {}
     }, function()
@@ -1054,9 +1054,9 @@ function OpenAdminAccountTransactionsPage(acc, transactions, ParentPage)
 end
 
 function OpenAdminAccountDetails(accountId, ParentPage)
-    local ok, resp = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:GetAccount', { account = tostring(accountId) })
+    local ok, resp = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:GetAccount', { account = tostring(accountId) })
     if not ok or not resp or not resp.account then
-        Notify(_U('admin_action_failed') or 'Failed to load account.', 'error', 3500)
+        Notify(Feather.Locale.translateUpper('admin_action_failed') or 'Failed to load account.', 'error', 3500)
         return
     end
 
@@ -1064,7 +1064,7 @@ function OpenAdminAccountDetails(accountId, ParentPage)
     local Page = FeatherBankMenu:RegisterPage('bank:page:admin:account:' .. tostring(acc.id))
 
     Page:RegisterElement('header', {
-        value = _U('account_details_header') or 'Account Details',
+        value = Feather.Locale.translateUpper('account_details_header') or 'Account Details',
         slot = 'header'
     })
     Page:RegisterElement('subheader', {
@@ -1080,20 +1080,20 @@ function OpenAdminAccountDetails(accountId, ParentPage)
     Page:RegisterElement('imageboxcontainer', {
         slot  = 'content',
         items = {
-            { type = 'imagebox', index = 401, data = { img = 'nui://bcc-banks/ui/images/money_moneystack.png', label = '$' .. tostring(acc.cash or 0), tooltip = _U('cash_balance_tooltip'), style = { margin = '6px' } } },
-            { type = 'imagebox', index = 402, data = { img = 'nui://bcc-banks/ui/images/provision_goldbar_small.png', label = tostring(acc.gold or 0) .. ' g', tooltip = _U('gold_balance_tooltip'), style = { margin = '6px' } } }
+            { type = 'imagebox', index = 401, data = { img = 'nui://bcc-banks/ui/images/money_moneystack.png', label = '$' .. tostring(acc.cash or 0), tooltip = Feather.Locale.translateUpper('cash_balance_tooltip'), style = { margin = '6px' } } },
+            { type = 'imagebox', index = 402, data = { img = 'nui://bcc-banks/ui/images/provision_goldbar_small.png', label = tostring(acc.gold or 0) .. ' g', tooltip = Feather.Locale.translateUpper('gold_balance_tooltip'), style = { margin = '6px' } } }
         }
     })
 
     -- Meta
     local ownerName = ((acc.owner_firstname or '') ~= '' or (acc.owner_lastname or '') ~= '')
         and (tostring(acc.owner_firstname or '') .. ' ' .. tostring(acc.owner_lastname or ''))
-        or (_U('unknown') or 'Unknown')
+        or (Feather.Locale.translateUpper('unknown') or 'Unknown')
     local html = [[
         <div style="padding:20px; text-align:left;">
             <div><b>]] ..
-    (_U('account_number_label') or 'Account Number') .. [[</b> ]] .. tostring(acc.account_number or '-') .. [[</div>
-            <div><b>]] .. (_U('account_name_label') or 'Name') .. [[</b> ]] .. tostring(acc.name or '-') .. [[</div>
+    (Feather.Locale.translateUpper('account_number_label') or 'Account Number') .. [[</b> ]] .. tostring(acc.account_number or '-') .. [[</div>
+            <div><b>]] .. (Feather.Locale.translateUpper('account_name_label') or 'Name') .. [[</b> ]] .. tostring(acc.name or '-') .. [[</div>
             <div><b>Owner ID</b> ]] .. tostring(acc.owner_id or '-') .. [[</div>
             <div><b>Owner Name</b> ]] .. ownerName .. [[</div>
         </div>
@@ -1105,30 +1105,30 @@ function OpenAdminAccountDetails(accountId, ParentPage)
 
     local isFrozen = acc.is_frozen == 1 or acc.is_frozen == true
     Page:RegisterElement('textdisplay', {
-        value = isFrozen and (_U('admin_account_locked_status') or 'Status: Locked') or
-            (_U('admin_account_unlocked_status') or 'Status: Unlocked'),
+        value = isFrozen and (Feather.Locale.translateUpper('admin_account_locked_status') or 'Status: Locked') or
+            (Feather.Locale.translateUpper('admin_account_unlocked_status') or 'Status: Unlocked'),
         slot = 'content'
     })
     Page:RegisterElement('button', {
-        label = _U('view_transactions_button') or 'View Transactions',
+        label = Feather.Locale.translateUpper('view_transactions_button') or 'View Transactions',
         style = {}
     }, function()
         OpenAdminAccountTransactionsPage(acc, resp.transactions or {}, Page)
     end)
     Page:RegisterElement('button', {
-        label = isFrozen and (_U('admin_unlock_account_button') or 'Unlock Account') or
-            (_U('admin_lock_account_button') or 'Lock Account'),
+        label = isFrozen and (Feather.Locale.translateUpper('admin_unlock_account_button') or 'Unlock Account') or
+            (Feather.Locale.translateUpper('admin_lock_account_button') or 'Lock Account'),
         style = {}
     }, function()
         local targetState = not isFrozen
-        local okSet = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:SetAccountFrozen', {
+        local okSet = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:SetAccountFrozen', {
             account = tostring(acc.id),
             frozen = targetState
         })
-        local successMsg = targetState and (_U('admin_lock_account_success') or 'Account locked.') or
-            (_U('admin_unlock_account_success') or 'Account unlocked.')
-        local failMsg = targetState and (_U('admin_lock_account_failed') or 'Failed to lock account.') or
-            (_U('admin_unlock_account_failed') or 'Failed to unlock account.')
+        local successMsg = targetState and (Feather.Locale.translateUpper('admin_lock_account_success') or 'Account locked.') or
+            (Feather.Locale.translateUpper('admin_unlock_account_success') or 'Account unlocked.')
+        local failMsg = targetState and (Feather.Locale.translateUpper('admin_lock_account_failed') or 'Failed to lock account.') or
+            (Feather.Locale.translateUpper('admin_unlock_account_failed') or 'Failed to unlock account.')
         Notify(okSet and successMsg or failMsg, okSet and 'success' or 'error', 3500)
         if okSet then
             OpenAdminAccountDetails(acc.id, ParentPage)
@@ -1136,12 +1136,12 @@ function OpenAdminAccountDetails(accountId, ParentPage)
     end)
 
     Page:RegisterElement('button', {
-        label = _U('admin_delete_account_button') or 'Delete Account',
+        label = Feather.Locale.translateUpper('admin_delete_account_button') or 'Delete Account',
         style = {}
     }, function()
-        local okDel = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:DeleteAccount', { account = tostring(acc.id) })
-        Notify(okDel and (_U('admin_delete_account_success') or 'Account deleted.') or
-            (_U('admin_delete_account_failed') or 'Failed to delete account.'),
+        local okDel = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:DeleteAccount', { account = tostring(acc.id) })
+        Notify(okDel and (Feather.Locale.translateUpper('admin_delete_account_success') or 'Account deleted.') or
+            (Feather.Locale.translateUpper('admin_delete_account_failed') or 'Failed to delete account.'),
             okDel and 'success' or 'error', 3500)
         if okDel and ParentPage then
             ParentPage:RouteTo()
@@ -1149,15 +1149,15 @@ function OpenAdminAccountDetails(accountId, ParentPage)
     end)
 
     Page:RegisterElement('button', {
-        label = _U('admin_force_delete_account_button') or 'Force Delete Account',
+        label = Feather.Locale.translateUpper('admin_force_delete_account_button') or 'Force Delete Account',
         style = {}
     }, function()
-        local okDel = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:DeleteAccount', {
+        local okDel = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:DeleteAccount', {
             account = tostring(acc.id),
             force = true
         })
-        Notify(okDel and (_U('admin_force_delete_account_success') or 'Account deleted (forced).') or
-            (_U('admin_force_delete_account_failed') or 'Failed to force delete account.'),
+        Notify(okDel and (Feather.Locale.translateUpper('admin_force_delete_account_success') or 'Account deleted (forced).') or
+            (Feather.Locale.translateUpper('admin_force_delete_account_failed') or 'Failed to force delete account.'),
             okDel and 'success' or 'error', 3500)
         if okDel and ParentPage then
             ParentPage:RouteTo()
@@ -1169,7 +1169,7 @@ function OpenAdminAccountDetails(accountId, ParentPage)
         style = {}
     })
     Page:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot = 'footer',
         style = {}
     }, function()
@@ -1186,11 +1186,11 @@ end
 function OpenAdminLoansMenu(Parent, bank)
     local AdminLoansPage = FeatherBankMenu:RegisterPage('bank:page:admin:loans')
     AdminLoansPage:RegisterElement('header', {
-        value = _U('admin_loans_header'),
+        value = Feather.Locale.translateUpper('admin_loans_header'),
         slot  = 'header'
     })
     AdminLoansPage:RegisterElement('subheader', {
-        value = _U('admin_loans_subheader'),
+        value = Feather.Locale.translateUpper('admin_loans_subheader'),
         slot  = 'header'
     })
     AdminLoansPage:RegisterElement('line', {
@@ -1201,8 +1201,8 @@ function OpenAdminLoansMenu(Parent, bank)
     local bankIdValue = bank and tostring(bank.id) or ''
     if not bank then
         AdminLoansPage:RegisterElement('input', {
-            label       = _U('admin_bank_id_label'),
-            placeholder = _U('admin_bank_id_placeholder'),
+            label       = Feather.Locale.translateUpper('admin_bank_id_label'),
+            placeholder = Feather.Locale.translateUpper('admin_bank_id_placeholder'),
             style       = {}
         }, function(data)
             bankIdValue = data.value
@@ -1221,15 +1221,15 @@ function OpenAdminLoansMenu(Parent, bank)
     local function loadLoanSections(targetBankId)
         if not targetBankId then return end
 
-        local okPending, pendingLoans = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListPendingLoans', { bank = targetBankId })
+        local okPending, pendingLoans = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ListPendingLoans', { bank = targetBankId })
         if not okPending then
-            Notify(_U('admin_action_failed'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_action_failed'), 3000)
             return
         end
 
-        local okAll, allLoans = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListLoans', { bank = targetBankId })
+        local okAll, allLoans = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ListLoans', { bank = targetBankId })
         if not okAll then
-            Notify(_U('admin_action_failed'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_action_failed'), 3000)
             return
         end
 
@@ -1243,7 +1243,7 @@ function OpenAdminLoansMenu(Parent, bank)
         if pendingLoans and #pendingLoans > 0 then
             hasAny = true
             AdminLoansPage:RegisterElement('textdisplay', {
-                value = _U('admin_pending_loans') or 'Pending Loans',
+                value = Feather.Locale.translateUpper('admin_pending_loans') or 'Pending Loans',
                 slot  = 'content'
             })
             renderLoanButtons(AdminLoansPage, pendingLoans, bank, Parent)
@@ -1273,7 +1273,7 @@ function OpenAdminLoansMenu(Parent, bank)
             end
             hasAny = true
             AdminLoansPage:RegisterElement('textdisplay', {
-                value = _U('admin_all_loans') or 'All Loans',
+                value = Feather.Locale.translateUpper('admin_all_loans') or 'All Loans',
                 slot  = 'content'
             })
             renderLoanButtons(AdminLoansPage, remaining, bank, Parent)
@@ -1281,7 +1281,7 @@ function OpenAdminLoansMenu(Parent, bank)
 
         if not hasAny then
             AdminLoansPage:RegisterElement('textdisplay', {
-                value = _U('no_loans_found') or 'No loans found.',
+                value = Feather.Locale.translateUpper('no_loans_found') or 'No loans found.',
                 slot  = 'content'
             })
         end
@@ -1299,7 +1299,7 @@ function OpenAdminLoansMenu(Parent, bank)
         style = {}
     })
     AdminLoansPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
@@ -1315,11 +1315,11 @@ end
 function OpenAdminSDBsMenu(Parent, bank)
     local AdminSDBsPage = FeatherBankMenu:RegisterPage('bank:page:admin:sdbs')
     AdminSDBsPage:RegisterElement('header', {
-        value = _U('admin_sdbs_header'),
+        value = Feather.Locale.translateUpper('admin_sdbs_header'),
         slot  = 'header'
     })
     AdminSDBsPage:RegisterElement('subheader', {
-        value = _U('admin_sdbs_subheader'),
+        value = Feather.Locale.translateUpper('admin_sdbs_subheader'),
         slot  = 'header'
     })
     AdminSDBsPage:RegisterElement('line', {
@@ -1330,30 +1330,30 @@ function OpenAdminSDBsMenu(Parent, bank)
     local bankIdValue = bank and tostring(bank.id) or ''
     if not bank then
         AdminSDBsPage:RegisterElement('input', {
-            label       = _U('admin_bank_id_label'),
-            placeholder = _U('admin_bank_id_placeholder'),
+            label       = Feather.Locale.translateUpper('admin_bank_id_label'),
+            placeholder = Feather.Locale.translateUpper('admin_bank_id_placeholder'),
             style       = {}
         }, function(data)
             bankIdValue = data.value
         end)
     else
         AdminSDBsPage:RegisterElement('textdisplay', {
-        value = _U('bank_label') .. ': ' .. tostring(bank.name),
+        value = Feather.Locale.translateUpper('bank_label') .. ': ' .. tostring(bank.name),
             slot = 'content'
         })
     end
     AdminSDBsPage:RegisterElement('button', {
-        label = _U('admin_fetch_button'),
+        label = Feather.Locale.translateUpper('admin_fetch_button'),
         style = {}
     }, function()
         local bankId = NormalizeId(bankIdValue)
         if not bankId then
-            Notify(_U('admin_invalid_bank_id'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_invalid_bank_id'), 3000)
             return
         end
-        local ok, rows = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:ListSDBs', { bank = bankId })
+        local ok, rows = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:ListSDBs', { bank = bankId })
         if not ok then
-            Notify(_U('admin_action_failed'), 3000)
+            Notify(Feather.Locale.translateUpper('admin_action_failed'), 3000)
             return
         end
         -- Render interactive buttons per SDB: "<Name> — Char <owner_id>"
@@ -1363,12 +1363,12 @@ function OpenAdminSDBsMenu(Parent, bank)
         })
         if not rows or #rows == 0 then
             AdminSDBsPage:RegisterElement('textdisplay', {
-                value = _U('no_boxes_found'),
+                value = Feather.Locale.translateUpper('no_boxes_found'),
                 slot  = 'content'
             })
         else
             for _, box in ipairs(rows or {}) do
-                local boxName = (box.name and tostring(box.name)) or (_U('box_default_name', tostring(box.id)) or ('Box #' .. tostring(box.id)))
+                local boxName = (box.name and tostring(box.name)) or (Feather.Locale.translateUpper('box_default_name', tostring(box.id)) or ('Box #' .. tostring(box.id)))
                 local ownerId = tostring(box.owner_id or '-')
                 local label   = boxName .. ' — Char ' .. ownerId
 
@@ -1380,9 +1380,9 @@ function OpenAdminSDBsMenu(Parent, bank)
                     FeatherBankMenu:Close()
                     SetNuiFocus(false, false)
                     Wait(250)
-                    local okOpen = exports['feather-core']:CallRPCAsync('Feather:Banks:Admin:OpenSDB', { sdb_id = NormalizeId(box.id) })
+                    local okOpen = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:OpenSDB', { sdb_id = NormalizeId(box.id) })
                     if not okOpen then
-                        Notify(_U('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
+                        Notify(Feather.Locale.translateUpper('error_unable_open_sdb') or 'Unable to open SDB right now.', 'error', 3500)
                     end
                 end)
             end
@@ -1395,7 +1395,7 @@ function OpenAdminSDBsMenu(Parent, bank)
         style = {}
     })
     AdminSDBsPage:RegisterElement('button', {
-        label = _U('back_button'),
+        label = Feather.Locale.translateUpper('back_button'),
         slot  = 'footer',
         style = {}
     }, function()
