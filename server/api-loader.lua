@@ -58,14 +58,17 @@ function GetBankingContext(source)
     local function currencyName(currencyId)
         return tonumber(currencyId) == 1 and 'gold' or 'dollars'
     end
-    function character.CreditWallet(currencyId, amount)
+    -- `reason` must be a bank.* code Economy allow-lists for bcc-banks supply
+    -- (see Config.BankSupply in feather-economy); it defaults to a plain credit.
+    function character.CreditWallet(currencyId, amount, reason)
         local currency = currencyName(currencyId)
         local units = math.floor((tonumber(amount) or 0) * 100 + 0.5)
         local result = BanksEconomy.Issue({
             toAccountId = wallets.value[currency].accountId,
             currency = currency,
             amount = units,
-            reasonCode = 'banks.wallet.credit',
+            actorCharacterId = identity.characterId,
+            reasonCode = reason or 'bank.wallet.credit',
             referenceType = 'bcc_bank_wallet',
             referenceId = identity.characterId,
             idempotencyKey = ('banks:credit:%s'):format(MySQL.scalar.await('SELECT UUID()'))
@@ -73,14 +76,15 @@ function GetBankingContext(source)
         if not result.ok then error(result.code or 'economy_credit_failed') end
         return true
     end
-    function character.DebitWallet(currencyId, amount)
+    function character.DebitWallet(currencyId, amount, reason)
         local currency = currencyName(currencyId)
         local units = math.floor((tonumber(amount) or 0) * 100 + 0.5)
         local result = BanksEconomy.Destroy({
             fromAccountId = wallets.value[currency].accountId,
             currency = currency,
             amount = units,
-            reasonCode = 'banks.wallet.debit',
+            actorCharacterId = identity.characterId,
+            reasonCode = reason or 'bank.wallet.debit',
             referenceType = 'bcc_bank_wallet',
             referenceId = identity.characterId,
             idempotencyKey = ('banks:debit:%s'):format(MySQL.scalar.await('SELECT UUID()'))
@@ -91,13 +95,13 @@ function GetBankingContext(source)
     return character
 end
 
--- Shared temporary wallets for the Feather shops port.
+-- Character wallets as seen by banks; balances come from Feather Economy.
 exports('GetBankingContext', GetBankingContext)
 
 MySQL.ready(function()
     local initialized = BanksEconomy.Initialize()
     if type(initialized) ~= 'table' or initialized.ok ~= true then
-        error(('[bcc-banks] temporary Economy initialization failed: %s'):format(
+        error(('[bcc-banks] Economy initialization failed: %s'):format(
             tostring(type(initialized) == 'table' and initialized.code or 'invalid_result')))
     end
 end)

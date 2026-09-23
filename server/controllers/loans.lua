@@ -94,7 +94,7 @@ function RepayLoan(loan_id, account_id, character_id, amount)
     end
 
     -- Withdraw from account to repay the loan
-    local ok = WithdrawCash(account_id, amount)
+    local ok = WithdrawCash(account_id, amount, 'bank.loan.repayment')
     if not ok then
         return { status = false, message = 'Insufficient account funds.' }
     end
@@ -148,7 +148,7 @@ function ApproveLoan(loan_id, approver_char_id)
     -- Disbursement: if account linked, deposit now; otherwise leave funds claimable.
     local amt = tonumber(loan.amount) or 0
     if loan.account_id then
-        local ok = DepositCash(loan.account_id, amt)
+        local ok = DepositCash(loan.account_id, amt, 'bank.loan.disbursement')
         if not ok then
             MySQL.update.await(
                 'UPDATE `bcc_loans` SET `status` = \'pending\', `approved_by` = NULL, `approved_at` = NULL WHERE `id` = ? AND `disbursed_account_id` IS NULL',
@@ -201,7 +201,7 @@ function ClaimLoanToAccount(loan_id, account_id, character_id)
     end
 
     local amt = tonumber(loan.amount) or 0
-    local ok = DepositCash(account_id, amt)
+    local ok = DepositCash(account_id, amt, 'bank.loan.disbursement')
     if not ok then
         MySQL.update.await(
             'UPDATE `bcc_loans` SET `disbursed_account_id` = NULL, `disbursed_at` = NULL WHERE `id` = ? AND `disbursed_account_id` = ?',

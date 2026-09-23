@@ -61,7 +61,7 @@ local function EnsureEconomyAccounts(account)
         if units > 0 then
             local imported = BanksEconomy.Issue({
                 toAccountId = account[definition.column], currency = definition.currency,
-                amount = units, reasonCode = 'economy.migration.bcc_bank_balance',
+                amount = units, reasonCode = 'bank.migration.import',
                 referenceType = 'bcc_bank_account', referenceId = tostring(account.id),
                 idempotencyKey = ('banks:legacy:%s:%s'):format(account.id, definition.currency)
             })
@@ -291,48 +291,85 @@ function GetAccountAccess(account, character)
     return result and result[1] and tonumber(result[1].level) or 0
 end
 
-function DepositCash(account, amount)
+-- Credits an account without a wallet on the other side (check cashing, loan
+-- disbursement, rollbacks). `reason` is one of Economy's allow-listed bank.* supply
+-- codes; wallet <-> account movements use DepositFromWallet / WithdrawToWallet.
+function DepositCash(account, amount, reason)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
     local row = GetAccount(account)
     if not row then return false end
     return BanksEconomy.Issue({ toAccountId = row.dollars_account_id, currency = 'dollars',
-        amount = ToUnits(amount), reasonCode = 'banks.transitional.deposit',
+        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
         referenceType = 'bcc_bank_account', referenceId = tostring(account),
         idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
 end
 
-function DepositGold(account, amount)
+function DepositGold(account, amount, reason)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
     local row = GetAccount(account)
     if not row then return false end
     return BanksEconomy.Issue({ toAccountId = row.gold_account_id, currency = 'gold',
-        amount = ToUnits(amount), reasonCode = 'banks.transitional.deposit',
+        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
         referenceType = 'bcc_bank_account', referenceId = tostring(account),
         idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
 end
 
-function WithdrawCash(account, amount)
+function WithdrawCash(account, amount, reason)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
     local row = GetAccount(account)
     if not row or row.is_frozen == 1 or row.is_frozen == true then return false end
     return BanksEconomy.Destroy({ fromAccountId = row.dollars_account_id, currency = 'dollars',
-        amount = ToUnits(amount), reasonCode = 'banks.transitional.withdrawal',
+        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
         referenceType = 'bcc_bank_account', referenceId = tostring(account),
         idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
 end
 
-function WithdrawGold(account, amount)
+function WithdrawGold(account, amount, reason)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
     local row = GetAccount(account)
     if not row or row.is_frozen == 1 or row.is_frozen == true then return false end
     return BanksEconomy.Destroy({ fromAccountId = row.gold_account_id, currency = 'gold',
-        amount = ToUnits(amount), reasonCode = 'banks.transitional.withdrawal',
+        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
         referenceType = 'bcc_bank_account', referenceId = tostring(account),
         idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
+end
+
+-- Moves funds from the acting character's wallet into a bank account in one
+-- Economy transfer, so the wallet debit and the account credit either both
+-- happen or neither does. Access to the account is checked by the caller.
+function DepositFromWallet(char, account, currency, amount)
+    amount = tonumber(amount)
+    if not char or not char.wallets or not char.wallets[currency]
+        or not account or not IsFinitePositiveNumber(amount) then return false end
+    local row = GetAccount(account)
+    local target = row and row[currency .. '_account_id']
+    if not target then return false end
+    return BanksEconomy.Transfer({ fromAccountId = char.wallets[currency].accountId,
+        toAccountId = target, currency = currency, amount = ToUnits(amount),
+        reasonCode = 'bank.deposit', referenceType = 'bcc_bank_account', referenceId = tostring(account),
+        idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')),
+        actorCharacterId = char.characterId, actorAccountId = char.accountId }).ok
+end
+
+-- The reverse: bank account to the acting character's wallet, one transfer.
+-- A frozen account cannot be withdrawn from.
+function WithdrawToWallet(char, account, currency, amount)
+    amount = tonumber(amount)
+    if not char or not char.wallets or not char.wallets[currency]
+        or not account or not IsFinitePositiveNumber(amount) then return false end
+    local row = GetAccount(account)
+    if not row or row.is_frozen == 1 or row.is_frozen == true then return false end
+    local source = row[currency .. '_account_id']
+    if not source then return false end
+    return BanksEconomy.Transfer({ fromAccountId = source,
+        toAccountId = char.wallets[currency].accountId, currency = currency, amount = ToUnits(amount),
+        reasonCode = 'bank.withdraw', referenceType = 'bcc_bank_account', referenceId = tostring(account),
+        idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')),
+        actorCharacterId = char.characterId, actorAccountId = char.accountId }).ok
 end
 
 function TransferAccountCash(fromAccount, toAccount, debitAmount, creditAmount)
@@ -348,20 +385,22 @@ function TransferAccountCash(fromAccount, toAccount, debitAmount, creditAmount)
     if not source or not destination or source.is_frozen == 1 or source.is_frozen == true then return false end
     local moved = BanksEconomy.Transfer({ fromAccountId = source.dollars_account_id,
         toAccountId = destination.dollars_account_id, amount = ToUnits(creditAmount),
-        reasonCode = 'banks.account.transfer', referenceType = 'bcc_bank_account',
+        reasonCode = 'bank.transfer', referenceType = 'bcc_bank_account',
         referenceId = tostring(fromAccount),
         idempotencyKey = ('banks:transfer:%s'):format(MySQL.scalar.await('SELECT UUID()')) })
     if not moved.ok then return false end
     local fee = ToUnits(debitAmount - creditAmount)
     if fee > 0 then
-        local charged = BanksEconomy.Destroy({ fromAccountId = source.dollars_account_id,
-            currency = 'dollars', amount = fee, reasonCode = 'banks.transfer.fee',
-            referenceType = 'economy_transaction', referenceId = moved.value.transactionId,
-            idempotencyKey = ('banks:fee:%s'):format(moved.value.transactionId) })
+        local sink = BanksEconomy.GetSystemAccount({ currency = 'dollars', accountType = 'system_sink' })
+        local charged = sink.ok and BanksEconomy.Transfer({ fromAccountId = source.dollars_account_id,
+            toAccountId = sink.value.accountId, currency = 'dollars', amount = fee,
+            reasonCode = 'bank.fee', referenceType = 'economy_transaction',
+            referenceId = moved.value.transactionId,
+            idempotencyKey = ('banks:fee:%s'):format(moved.value.transactionId) }) or sink
         if not charged.ok then
             BanksEconomy.Transfer({ fromAccountId = destination.dollars_account_id,
                 toAccountId = source.dollars_account_id, amount = ToUnits(creditAmount),
-                reasonCode = 'banks.transfer.compensation', referenceType = 'economy_transaction',
+                reasonCode = 'bank.transfer', referenceType = 'economy_transaction',
                 referenceId = moved.value.transactionId,
                 idempotencyKey = ('banks:compensate:%s'):format(moved.value.transactionId) })
             return false

@@ -563,7 +563,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:RepayLoan', function(params, cb, 
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(0, amount) end)
+    local removed = pcall(function() char.DebitWallet(0, amount, 'bank.loan.repayment') end)
     if not removed then
         ReleasePlayerFinancialLock(src)
         ActiveLoanRepayments[loan_id] = nil

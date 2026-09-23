@@ -22,9 +22,10 @@ client_scripts {
 }
 
 server_scripts {
-   '@oxmysql/lib/MySQL.lua',
+   '@feather-mysql/lib/MySQL.lua',
    'server/feather/init.lua',
    'server/feather/economy.lua',
+   'server/feather/migration.lua',
    'languages/*.lua',
    'server/api-loader.lua',
    'server/helpers/*.lua',
@@ -34,11 +35,12 @@ server_scripts {
 }
 
 dependencies {
-   'oxmysql',
+   'feather-mysql',
    'feather-core',
    'feather-toolkit',
    'feather-notify',
    'feather-character',
+   'feather-economy',
    'feather-roles',
    'feather-inventory',
    'feather-menu-v2',
