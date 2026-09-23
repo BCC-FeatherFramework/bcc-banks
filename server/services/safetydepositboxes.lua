@@ -112,7 +112,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, 
     -- try to charge first so we don't create resources the player can't pay for
     local charged = false
     local chargeOk, chargeErr = pcall(function()
-        char.DebitWallet(currencyId, price)
+        char.DebitWallet(currencyId, price, 'bank.box.fee')
         charged = true
     end)
     if not chargeOk then
@@ -126,7 +126,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, 
     local ok, boxOrErr, szFromCtrl = pcall(CreateSDB, name, characterId, bank, resolvedKey)
     if not ok or boxOrErr == false then
         -- refund if DB failed
-        if charged then pcall(function() if char.CreditWallet then char.CreditWallet(currencyId, price) end end) end
+        if charged then pcall(function() if char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund') end end) end
         devPrint("CreateSDB DB failed:", tostring(ok and (szFromCtrl or "unknown") or boxOrErr))
         NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
         ReleasePlayerFinancialLock(src)
@@ -171,7 +171,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, 
         pcall(function()
             MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', { box.id })
             MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', { box.id })
-            if charged and char.CreditWallet then char.CreditWallet(currencyId, price) end
+            if charged and char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund') end
         end)
         devPrint("CreateSDB: inventory registration failed:", tostring(invErr))
         NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)

@@ -87,10 +87,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:BuyGold', function(params, cb, sr
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(0, cost) end)
-    local credited = removed and pcall(function() char.CreditWallet(1, gold) end)
+    local removed = pcall(function() char.DebitWallet(0, cost, 'bank.gold.exchange') end)
+    local credited = removed and pcall(function() char.CreditWallet(1, gold, 'bank.gold.exchange') end)
     if not credited then
-        if removed then pcall(function() char.CreditWallet(0, cost) end) end
+        if removed then pcall(function() char.CreditWallet(0, cost, 'bank.compensation') end) end
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -175,10 +175,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:SellGold', function(params, cb, s
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(1, gold) end)
-    local credited = removed and pcall(function() char.CreditWallet(0, proceeds) end)
+    local removed = pcall(function() char.DebitWallet(1, gold, 'bank.gold.exchange') end)
+    local credited = removed and pcall(function() char.CreditWallet(0, proceeds, 'bank.gold.exchange') end)
     if not credited then
-        if removed then pcall(function() char.CreditWallet(1, gold) end) end
+        if removed then pcall(function() char.CreditWallet(1, gold, 'bank.compensation') end) end
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -252,7 +252,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:ExchangeGoldBars', function(param
     local grossGold = perBarGold * count
     local netGold = roundTo(grossGold * (1 - (feePercent / 100)), 2)
     if netGold < 0 then netGold = 0 end
-    local credited = pcall(function() char.CreditWallet(1, netGold) end)
+    local credited = pcall(function() char.CreditWallet(1, netGold, 'bank.gold.exchange') end)
     if not credited then
         inventory.Items.AddItem(itemName, count, nil, src)
         ReleasePlayerFinancialLock(src)

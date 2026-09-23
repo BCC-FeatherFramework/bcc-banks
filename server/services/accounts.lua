@@ -610,17 +610,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:DepositCash', function(params, cb
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(0, amount) end)
-    if not removed then
+    -- One Economy transfer moves the money wallet -> account atomically.
+    if not DepositFromWallet(char, account, 'dollars', amount) then
         ReleasePlayerFinancialLock(src)
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_cash'), "error", 4000)
-        cb(false)
-        return
-    end
-    if not DepositCash(account, amount) then
-        pcall(function() char.CreditWallet(0, amount) end)
-        ReleasePlayerFinancialLock(src)
-        devPrint("DepositCash: DB update failed.")
+        devPrint("DepositCash: Economy transfer failed.")
         NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_cash') or 'Unable to deposit cash at this time.', "error", 4000)
         cb(false)
         return
@@ -696,17 +689,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:DepositGold', function(params, cb
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(1, amount) end)
-    if not removed then
+    if not DepositFromWallet(char, account, 'gold', amount) then
         ReleasePlayerFinancialLock(src)
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_gold'), "error", 4000)
-        cb(false)
-        return
-    end
-    if not DepositGold(account, amount) then
-        pcall(function() char.CreditWallet(1, amount) end)
-        ReleasePlayerFinancialLock(src)
-        devPrint("DepositGold: DB update failed.")
+        devPrint("DepositGold: Economy transfer failed.")
         NotifyClient(src, Feather.Locale.translateUpper('error_unable_deposit_gold'), "error", 4000)
         cb(false)
         return
@@ -782,18 +767,12 @@ exports['feather-core']:RegisterRPC('bcc-banks:WithdrawCash', function(params, c
         cb(false)
         return
     end
-    if not WithdrawCash(account, amount) then
+    -- One Economy transfer moves the money account -> wallet atomically; an
+    -- account that cannot cover it is rejected by Economy.
+    if not WithdrawToWallet(char, account, 'dollars', amount) then
         ReleasePlayerFinancialLock(src)
-        devPrint("WithdrawCash: insufficient funds or DB failure.")
+        devPrint("WithdrawCash: insufficient funds or Economy failure.")
         NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_account_funds'), "error", 4000)
-        cb(false)
-        return
-    end
-    local credited = pcall(function() char.CreditWallet(0, amount) end)
-    if not credited then
-        DepositCash(account, amount)
-        ReleasePlayerFinancialLock(src)
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_withdraw'), "error", 4000)
         cb(false)
         return
     end
@@ -868,18 +847,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:WithdrawGold', function(params, c
         cb(false)
         return
     end
-    if not WithdrawGold(account, amount) then
+    if not WithdrawToWallet(char, account, 'gold', amount) then
         ReleasePlayerFinancialLock(src)
-        devPrint("WithdrawGold: insufficient funds or DB failure.")
+        devPrint("WithdrawGold: insufficient funds or Economy failure.")
         NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_account_funds'), "error", 4000)
-        cb(false)
-        return
-    end
-    local credited = pcall(function() char.CreditWallet(1, amount) end)
-    if not credited then
-        DepositGold(account, amount)
-        ReleasePlayerFinancialLock(src)
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_withdraw'), "error", 4000)
         cb(false)
         return
     end

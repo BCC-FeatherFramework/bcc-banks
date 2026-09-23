@@ -31,7 +31,7 @@ function CreateCheck(accountId, issuerCharId, recipientCharId, amount, memo)
     end
 
     -- Deduct from account now (no bounced checks)
-    local ok = WithdrawCash(accountId, amount)
+    local ok = WithdrawCash(accountId, amount, 'bank.check.issue')
     if not ok then
         return { status = false, message = 'Insufficient funds.' }
     end
@@ -42,7 +42,7 @@ function CreateCheck(accountId, issuerCharId, recipientCharId, amount, memo)
         { checkId, accountId, issuerCharId, recipientCharId, amount, tostring(memo or ''):sub(1, 200) }
     )
     if not inserted then
-        DepositCash(accountId, amount)
+        DepositCash(accountId, amount, 'bank.compensation')
         return { status = false, message = 'Failed to create check.' }
     end
 
@@ -140,7 +140,7 @@ function VoidCheck(checkId, characterId)
         return { status = false, message = 'Cannot void a check that is not pending.' }
     end
 
-    if not DepositCash(check.account_id, tonumber(check.amount)) then
+    if not DepositCash(check.account_id, tonumber(check.amount), 'bank.check.cash') then
         MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending" WHERE `id` = ? AND `status` = "voided"', { checkId })
         return { status = false, message = 'Unable to refund check.' }
     end

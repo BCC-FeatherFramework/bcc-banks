@@ -135,7 +135,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:WriteCheck', function(params, cb,
         if not itemCreated then
             MySQL.update.await('UPDATE `bcc_checks` SET `status` = "voided" WHERE `id` = ? AND `status` = "pending"',
                 { result.check_id })
-            DepositCash(accountId, amount)
+            DepositCash(accountId, amount, 'bank.compensation')
             NotifyClient(src, Feather.Locale.translateUpper('error_unable_write_check'), 'error', 4000)
             cb(false)
             return
@@ -289,7 +289,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:CashCheck', function(params, cb, 
         return
     end
 
-    local credited = pcall(function() char.CreditWallet(0, result.amount) end)
+    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash') end)
     if not credited then
         MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', { checkId })
         ReleasePlayerFinancialLock(src)
@@ -430,7 +430,7 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
         return
     end
 
-    local credited = pcall(function() char.CreditWallet(0, result.amount) end)
+    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash') end)
     if not credited then
         MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', { checkId })
         ReleasePlayerFinancialLock(src)
