@@ -11,9 +11,9 @@ if not _G.__bcc_accounts_rng_seeded then
 end
 
 function GetAccountCount(owner, bank)
-    local result = MySQL.query.await(
+    local result = DB.query(
         'SELECT COUNT(*) AS cnt FROM `bcc_accounts` WHERE `owner_id` = ? AND `bank_id` = ?',
-        { owner, bank }
+        owner, bank
     )
     local row = result and result[1]
     return tonumber(row and (row.cnt or row["COUNT(*)"])) or 0
@@ -48,8 +48,8 @@ local function EnsureEconomyAccounts(account)
         end
     end
     if changed then
-        MySQL.update.await([[UPDATE bcc_accounts SET dollars_account_id = ?, gold_account_id = ?
-            WHERE id = ?]], { account.dollars_account_id, account.gold_account_id, account.id })
+        DB.exec([[UPDATE bcc_accounts SET dollars_account_id = ?, gold_account_id = ?
+            WHERE id = ?]], account.dollars_account_id, account.gold_account_id, account.id)
     end
 
     -- Import each legacy balance once. Idempotency makes this restart-safe.
@@ -97,7 +97,7 @@ function CreateAccount(name, owner, bank)
     local function nextUniqueAccountNumber()
         for i = 1, 20 do
             local candidate = generate8()
-            local exists = MySQL.query.await('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', { candidate })
+            local exists = DB.query('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', candidate)
             if not exists or not exists[1] then
                 return candidate
             end
@@ -105,7 +105,7 @@ function CreateAccount(name, owner, bank)
         -- Fallback: extremely unlikely to hit here; append a random 2-digit suffix and try again
         for i = 1, 80 do
             local candidate = tostring(math.random(10, 99)) .. tostring(math.random(1000000, 9999999))
-            local exists = MySQL.query.await('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', { candidate })
+            local exists = DB.query('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', candidate)
             if not exists or not exists[1] then
                 return candidate
             end
@@ -115,18 +115,18 @@ function CreateAccount(name, owner, bank)
 
     local acctNum = nextUniqueAccountNumber()
 
-    local accountId = MySQL.scalar.await('SELECT UUID()')
-    local result = MySQL.query.await(
+    local accountId = DB.value('SELECT UUID()')
+    local result = DB.query(
         'INSERT INTO `bcc_accounts` (id, account_number, name, bank_id, owner_id) VALUES (?, ?, ?, ?, ?) RETURNING *;',
-        { accountId, acctNum, name, bank, owner }
+        accountId, acctNum, name, bank, owner
     )
     local account = result and result[1]
     account = account and EnsureEconomyAccounts(account) or nil
 
     if account then
-        MySQL.query.await(
+        DB.exec(
             'INSERT INTO `bcc_accounts_access` (`account_id`, `character_id`, `level`) VALUES (?, ?, ?)',
-            { account.id, owner, Config.AccessLevels.Admin }
+            account.id, owner, Config.AccessLevels.Admin
         )
     end
 
@@ -150,14 +150,14 @@ function CreateAccountReturn(name, owner, bank)
     local function nextUniqueAccountNumber()
         for i = 1, 20 do
             local candidate = generate8()
-            local exists = MySQL.query.await('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', { candidate })
+            local exists = DB.query('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', candidate)
             if not exists or not exists[1] then
                 return candidate
             end
         end
         for i = 1, 80 do
             local candidate = tostring(math.random(10, 99)) .. tostring(math.random(1000000, 9999999))
-            local exists = MySQL.query.await('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', { candidate })
+            local exists = DB.query('SELECT 1 FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', candidate)
             if not exists or not exists[1] then
                 return candidate
             end
@@ -167,10 +167,10 @@ function CreateAccountReturn(name, owner, bank)
 
     local acctNum = nextUniqueAccountNumber()
 
-    local accountId = MySQL.scalar.await('SELECT UUID()')
-    local result = MySQL.query.await(
+    local accountId = DB.value('SELECT UUID()')
+    local result = DB.query(
         'INSERT INTO `bcc_accounts` (id, account_number, name, bank_id, owner_id) VALUES (?, ?, ?, ?, ?) RETURNING *;',
-        { accountId, acctNum, name, bank, owner }
+        accountId, acctNum, name, bank, owner
     )
     local account = result and result[1]
     account = account and EnsureEconomyAccounts(account) or nil
@@ -179,9 +179,9 @@ function CreateAccountReturn(name, owner, bank)
         return { status = false, message = 'Failed to create account.' }
     end
 
-    MySQL.query.await(
+    DB.exec(
         'INSERT INTO `bcc_accounts_access` (`account_id`, `character_id`, `level`) VALUES (?, ?, ?)',
-        { account.id, owner, Config.AccessLevels.Admin }
+        account.id, owner, Config.AccessLevels.Admin
     )
 
     return { status = true, account = account }
@@ -201,12 +201,12 @@ function CloseAccount(bank, account, character)
         return { status = false, message = "Insufficient Access." }
     end
 
-    MySQL.query.await('DELETE FROM `bcc_accounts` WHERE `id` = ?', { account })
+    DB.exec('DELETE FROM `bcc_accounts` WHERE `id` = ?', account)
     return { status = true, accounts = GetAccounts(character, bank) }
 end
 
 function GetAccounts(characterId, bankId)
-    local accounts = MySQL.query.await(
+    local accounts = DB.query(
         'SELECT ' ..
         'a.id, ' ..
         'a.name AS account_name, ' ..
@@ -220,14 +220,14 @@ function GetAccounts(characterId, bankId)
         '  ON b.id = a.bank_id ' ..
         'WHERE (a.owner_id = ? OR aa.character_id = ?) ' ..
         '  AND b.id = ?;',
-        { characterId, characterId, characterId, bankId }
+        characterId, characterId, characterId, bankId
     )
 
     return accounts or {}
 end
 
 function GetAccount(account)
-    local result = MySQL.query.await('SELECT * FROM `bcc_accounts` WHERE `id` = ?', { account })
+    local result = DB.query('SELECT * FROM `bcc_accounts` WHERE `id` = ?', account)
     local row = result and result[1] or nil
     return row and EnsureEconomyAccounts(row) or nil
 end
@@ -235,107 +235,98 @@ end
 -- Find account by external account_number (UUID-like)
 function GetAccountByNumber(accountNumber)
     if not accountNumber or accountNumber == '' then return nil end
-    local row = MySQL.query.await('SELECT * FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', { accountNumber })
+    local row = DB.query('SELECT * FROM `bcc_accounts` WHERE `account_number` = ? LIMIT 1;', accountNumber)
     local account = row and row[1] or nil
     return account and EnsureEconomyAccounts(account) or nil
 end
 
 -- Public listing: list all accounts under a bank (minimal fields)
 function GetAccountsByBankPublic(bankId)
-    local rows = MySQL.query.await(
+    local rows = DB.query(
         'SELECT id, name, account_number FROM `bcc_accounts` WHERE `bank_id` = ? ORDER BY `name` ASC, `id` ASC;',
-        { bankId }
+        bankId
     )
     return rows or {}
 end
 
 function AddAccountAccess(account, character, level)
-    MySQL.query.await(
+    DB.exec(
         'INSERT INTO `bcc_accounts_access` (`account_id`, `character_id`, `level`) VALUES (?, ?, ?);',
-        { account, character, level }
+        account, character, level
     )
     return true
 end
 
 function IsAccountOwner(account, character)
-    local result = MySQL.query.await(
+    local result = DB.query(
         'SELECT `owner_id` FROM `bcc_accounts` WHERE `id` = ? LIMIT 1;',
-        { account }
+        account
     )
     local owner = result and result[1] and result[1].owner_id
     return owner == character
 end
 
 function IsAccountAdmin(account, character)
-    local result = MySQL.query.await(
+    local result = DB.query(
         'SELECT `level` FROM `bcc_accounts_access` WHERE `account_id` = ? AND `character_id` = ? LIMIT 1;',
-        { account, character }
+        account, character
     )
     local record = result and result[1]
     return record and tonumber(record.level) == Config.AccessLevels.Admin
 end
 
 function HasAccountAccess(account, character)
-    local result = MySQL.query.await(
+    local result = DB.query(
         'SELECT 1 FROM `bcc_accounts_access` WHERE `account_id` = ? AND `character_id` = ? LIMIT 1;',
-        { account, character }
+        account, character
     )
     return result and result[1] ~= nil
 end
 
 function GetAccountAccess(account, character)
-    local result = MySQL.query.await(
+    local result = DB.query(
         'SELECT `level` FROM `bcc_accounts_access` WHERE `account_id` = ? AND `character_id` = ? LIMIT 1;',
-        { account, character }
+        account, character
     )
     return result and result[1] and tonumber(result[1].level) or 0
 end
 
--- Credits an account without a wallet on the other side (check cashing, loan
--- disbursement, rollbacks). `reason` is one of Economy's allow-listed bank.* supply
--- codes; wallet <-> account movements use DepositFromWallet / WithdrawToWallet.
-function DepositCash(account, amount, reason)
+-- Moves money between a bank account and a branch reserve (loan disbursement and
+-- repayment, checks, rollbacks). The reserve is the account's own branch unless
+-- `reserveBankId` names another one. `reason` is one of the bank.* reserve codes
+-- Economy accepts; wallet <-> account movements use DepositFromWallet / WithdrawToWallet.
+local function reserveTransfer(account, currency, amount, reason, reserveBankId, toAccount)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end
     local row = GetAccount(account)
     if not row then return false end
-    return BanksEconomy.Issue({ toAccountId = row.dollars_account_id, currency = 'dollars',
-        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
+    if not toAccount and (row.is_frozen == 1 or row.is_frozen == true) then return false end
+    local reserveId = BankOrganizations.GetReserveAccountId(reserveBankId or row.bank_id, currency)
+    if not reserveId then return false end
+    local accountId = currency == 'gold' and row.gold_account_id or row.dollars_account_id
+    return BanksEconomy.Transfer({
+        fromAccountId = toAccount and reserveId or accountId,
+        toAccountId = toAccount and accountId or reserveId,
+        currency = currency, amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
         referenceType = 'bcc_bank_account', referenceId = tostring(account),
-        idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
+        idempotencyKey = ('banks:%s:%s'):format(toAccount and 'deposit' or 'withdraw', DB.value('SELECT UUID()'))
+    }).ok
 end
 
-function DepositGold(account, amount, reason)
-    amount = tonumber(amount)
-    if not account or not IsFinitePositiveNumber(amount) then return false end
-    local row = GetAccount(account)
-    if not row then return false end
-    return BanksEconomy.Issue({ toAccountId = row.gold_account_id, currency = 'gold',
-        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
-        referenceType = 'bcc_bank_account', referenceId = tostring(account),
-        idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
+function DepositCash(account, amount, reason, reserveBankId)
+    return reserveTransfer(account, 'dollars', amount, reason, reserveBankId, true)
 end
 
-function WithdrawCash(account, amount, reason)
-    amount = tonumber(amount)
-    if not account or not IsFinitePositiveNumber(amount) then return false end
-    local row = GetAccount(account)
-    if not row or row.is_frozen == 1 or row.is_frozen == true then return false end
-    return BanksEconomy.Destroy({ fromAccountId = row.dollars_account_id, currency = 'dollars',
-        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
-        referenceType = 'bcc_bank_account', referenceId = tostring(account),
-        idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
+function DepositGold(account, amount, reason, reserveBankId)
+    return reserveTransfer(account, 'gold', amount, reason, reserveBankId, true)
 end
 
-function WithdrawGold(account, amount, reason)
-    amount = tonumber(amount)
-    if not account or not IsFinitePositiveNumber(amount) then return false end
-    local row = GetAccount(account)
-    if not row or row.is_frozen == 1 or row.is_frozen == true then return false end
-    return BanksEconomy.Destroy({ fromAccountId = row.gold_account_id, currency = 'gold',
-        amount = ToUnits(amount), reasonCode = reason or 'bank.compensation',
-        referenceType = 'bcc_bank_account', referenceId = tostring(account),
-        idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')) }).ok
+function WithdrawCash(account, amount, reason, reserveBankId)
+    return reserveTransfer(account, 'dollars', amount, reason, reserveBankId, false)
+end
+
+function WithdrawGold(account, amount, reason, reserveBankId)
+    return reserveTransfer(account, 'gold', amount, reason, reserveBankId, false)
 end
 
 -- Moves funds from the acting character's wallet into a bank account in one
@@ -351,7 +342,7 @@ function DepositFromWallet(char, account, currency, amount)
     return BanksEconomy.Transfer({ fromAccountId = char.wallets[currency].accountId,
         toAccountId = target, currency = currency, amount = ToUnits(amount),
         reasonCode = 'bank.deposit', referenceType = 'bcc_bank_account', referenceId = tostring(account),
-        idempotencyKey = ('banks:deposit:%s'):format(MySQL.scalar.await('SELECT UUID()')),
+        idempotencyKey = ('banks:deposit:%s'):format(DB.value('SELECT UUID()')),
         actorCharacterId = char.characterId, actorAccountId = char.accountId }).ok
 end
 
@@ -368,7 +359,7 @@ function WithdrawToWallet(char, account, currency, amount)
     return BanksEconomy.Transfer({ fromAccountId = source,
         toAccountId = char.wallets[currency].accountId, currency = currency, amount = ToUnits(amount),
         reasonCode = 'bank.withdraw', referenceType = 'bcc_bank_account', referenceId = tostring(account),
-        idempotencyKey = ('banks:withdraw:%s'):format(MySQL.scalar.await('SELECT UUID()')),
+        idempotencyKey = ('banks:withdraw:%s'):format(DB.value('SELECT UUID()')),
         actorCharacterId = char.characterId, actorAccountId = char.accountId }).ok
 end
 
@@ -384,10 +375,10 @@ function TransferAccountCash(fromAccount, toAccount, debitAmount, creditAmount)
     local source, destination = GetAccount(fromAccount), GetAccount(toAccount)
     if not source or not destination or source.is_frozen == 1 or source.is_frozen == true then return false end
     local moved = BanksEconomy.Transfer({ fromAccountId = source.dollars_account_id,
-        toAccountId = destination.dollars_account_id, amount = ToUnits(creditAmount),
+        toAccountId = destination.dollars_account_id, currency = 'dollars', amount = ToUnits(creditAmount),
         reasonCode = 'bank.transfer', referenceType = 'bcc_bank_account',
         referenceId = tostring(fromAccount),
-        idempotencyKey = ('banks:transfer:%s'):format(MySQL.scalar.await('SELECT UUID()')) })
+        idempotencyKey = ('banks:transfer:%s'):format(DB.value('SELECT UUID()')) })
     if not moved.ok then return false end
     local fee = ToUnits(debitAmount - creditAmount)
     if fee > 0 then
@@ -399,7 +390,7 @@ function TransferAccountCash(fromAccount, toAccount, debitAmount, creditAmount)
             idempotencyKey = ('banks:fee:%s'):format(moved.value.transactionId) }) or sink
         if not charged.ok then
             BanksEconomy.Transfer({ fromAccountId = destination.dollars_account_id,
-                toAccountId = source.dollars_account_id, amount = ToUnits(creditAmount),
+                toAccountId = source.dollars_account_id, currency = 'dollars', amount = ToUnits(creditAmount),
                 reasonCode = 'bank.transfer', referenceType = 'economy_transaction',
                 referenceId = moved.value.transactionId,
                 idempotencyKey = ('banks:compensate:%s'):format(moved.value.transactionId) })
@@ -420,7 +411,7 @@ end
 -- Freeze/unfreeze all accounts belonging to an owner character
 function SetOwnerAccountsFrozen(ownerId, frozen)
     if not ownerId then return end
-    MySQL.query.await('UPDATE `bcc_accounts` SET `is_frozen` = ? WHERE `owner_id` = ?', { frozen and 1 or 0, ownerId })
+    DB.exec('UPDATE `bcc_accounts` SET `is_frozen` = ? WHERE `owner_id` = ?', frozen and 1 or 0, ownerId)
 end
 
 function IsActiveUser(account, src)
@@ -444,33 +435,33 @@ function ClearAccountLocks(src)
 end
 
 function GetAccountAccessList(account)
-    local result = MySQL.query.await('SELECT character_id, level FROM `bcc_accounts_access` WHERE account_id = ?', { account })
+    local result = DB.query('SELECT character_id, level FROM `bcc_accounts_access` WHERE account_id = ?', account)
 
     return result or {}
 end
 
 function GiveAccountAccess(account, targetCharacter, level)
-    local result = MySQL.query.await(
+    local result = DB.query(
         'SELECT 1 FROM `bcc_accounts_access` WHERE `account_id` = ? AND `character_id` = ? LIMIT 1;',
-        { account, targetCharacter }
+        account, targetCharacter
     )
 
     if result and result[1] then
         return { status = false, message = "Character already has access." }
     end
 
-    MySQL.query.await(
+    DB.exec(
         'INSERT INTO `bcc_accounts_access` (`account_id`, `character_id`, `level`) VALUES (?, ?, ?)',
-        { account, targetCharacter, level }
+        account, targetCharacter, level
     )
 
     return { status = true, message = "Access granted." }
 end
 
 function RemoveAccountAccess(account, targetCharacter)
-    MySQL.query.await(
+    DB.exec(
         'DELETE FROM `bcc_accounts_access` WHERE `account_id` = ? AND `character_id` = ?',
-        { account, targetCharacter }
+        account, targetCharacter
     )
     return { status = true, message = "Access removed." }
 end

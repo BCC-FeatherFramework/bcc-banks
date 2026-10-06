@@ -289,6 +289,7 @@ Feather.Locale.register("ro", {
     admin_account_locked_status = "Status: Blocat",
     admin_account_unlocked_status = "Status: Deblocat",
     admin_invalid_account_freeze = "Introdu un cont / stare valida.",
+    admin_account_has_funds = "Contul inca are fonduri. Retrage-le inainte de stergere.",
     admin_delete_account_button = "Sterge contul",
     admin_delete_account_success = "Cont sters.",
     admin_delete_account_failed = "Nu s-a putut sterge contul.",

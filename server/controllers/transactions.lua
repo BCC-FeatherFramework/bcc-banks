@@ -1,5 +1,5 @@
 function GetAccountTransactions(account)
-    local transactions = MySQL.query.await(
+    local transactions = DB.query(
         'SELECT ' ..
         '  t.id, t.account_id, t.loan_id, t.character_id, ' ..
         '  t.character_id AS character_name, ' ..
@@ -8,7 +8,7 @@ function GetAccountTransactions(account)
         'LEFT JOIN bcc_loans AS l ON l.id = t.loan_id ' ..
         'WHERE t.account_id = ? OR l.account_id = ? ' ..
         'ORDER BY t.created_at DESC, t.id DESC;',
-        { account, account }
+        account, account
     )
     transactions = transactions or {}
 
@@ -33,7 +33,7 @@ end
 local function insertTransaction(query, params)
     for attempt = 1, 5 do
         local ok, err = pcall(function()
-            MySQL.query.await(query, params)
+            DB.exec(query, table.unpack(params))
         end)
         if ok then
             return true
@@ -41,7 +41,7 @@ local function insertTransaction(query, params)
 
         local errStr = err and tostring(err) or ''
         if errStr:find('Duplicate entry', 1, true) then
-            params[1] = MySQL.scalar.await('SELECT UUID()')
+            params[1] = DB.value('SELECT UUID()')
         else
             error(err)
         end
@@ -51,7 +51,7 @@ end
 
 function AddAccountTransaction(account, character, amount, txType, description)
     local params = {
-        MySQL.scalar.await('SELECT UUID()'),
+        DB.value('SELECT UUID()'),
         account,
         character,
         amount,
@@ -66,19 +66,19 @@ function AddAccountTransaction(account, character, amount, txType, description)
 end
 
 function GetLoanTransactions(loan)
-    local transactions = MySQL.query.await(
+    local transactions = DB.query(
         'SELECT id, account_id, loan_id, character_id, amount, type, description, created_at ' ..
         'FROM `bcc_transactions` ' ..
         'WHERE `loan_id` = ? ' ..
         'ORDER BY `created_at` DESC, `id` DESC;',
-        { loan }
+        loan
     )
     return transactions or {}
 end
 
 function AddLoanTransaction(loan, character, amount, txType, description)
     local params = {
-        MySQL.scalar.await('SELECT UUID()'),
+        DB.value('SELECT UUID()'),
         loan,
         character,
         amount,
@@ -94,7 +94,7 @@ end
 
 function AddCharacterTransaction(character, amount, txType, description)
     local params = {
-        MySQL.scalar.await('SELECT UUID()'),
+        DB.value('SELECT UUID()'),
         character,
         amount,
         txType,
@@ -108,11 +108,11 @@ function AddCharacterTransaction(character, amount, txType, description)
 end
 
 function SumLoanRepayments(loan)
-    local row = MySQL.query.await(
+    local row = DB.query(
         'SELECT COALESCE(SUM(amount), 0) AS total ' ..
         'FROM `bcc_transactions` ' ..
         'WHERE `loan_id` = ? AND `type` = "loan - repayment";',
-        { loan }
+        loan
     )
     return row and row[1] and tonumber(row[1].total) or 0
 end

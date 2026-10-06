@@ -14,7 +14,7 @@ local function getActiveBanker(bank)
 end
 
 function GetBanks()
-	local banks = MySQL.query.await('SELECT * FROM `bcc_banks`;')
+	local banks = DB.query('SELECT * FROM `bcc_banks`;')
 	return banks
 end
 

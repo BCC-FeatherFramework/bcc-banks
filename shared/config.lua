@@ -3,11 +3,16 @@ Config = {
 	Notify             = "feather-notify", -- Feather port notification provider
 	UseBankerBusy      = true,        -- If enabled only 1 person can use the bank at a time
 
-    -- Bank administration is authorized server-side by feather-roles.
+    -- Bank administration uses the active character's Authority assignments.
+    -- Feather Admin roles below also have access. bcc-banks registers `capability`, grants it to `role`,
+    -- and the console commands BccBanksAdminGrant/BccBanksAdminRevoke <server id>
+    -- assign or clear that bank-specific role for a player's active character.
     Admin = {
         allowConsole = true,
         command = 'bankadmin',
-        roles = { 'admin', 'owner' }
+        capability = 'staff.banks.manage',
+        role = 'staff.banks.admin',
+        staffRoles = { 'staff.admin.owner', 'staff.admin.administrator' }
     },
 
 	-- https://github.com/femga/rdr3_discoveries/blob/master/Controls/README.md

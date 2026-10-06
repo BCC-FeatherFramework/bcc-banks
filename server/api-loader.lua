@@ -58,47 +58,42 @@ function GetBankingContext(source)
     local function currencyName(currencyId)
         return tonumber(currencyId) == 1 and 'gold' or 'dollars'
     end
-    -- `reason` must be a bank.* code Economy allow-lists for bcc-banks supply
-    -- (see Config.BankSupply in feather-economy); it defaults to a plain credit.
-    function character.CreditWallet(currencyId, amount, reason)
+    -- Wallet payments settle against the reserve of branch `bankId`. `reason` is
+    -- one of the bank.* reserve codes Economy accepts (loan, check, box, gold).
+    local function reserveTransfer(currencyId, amount, reason, bankId, toWallet)
         local currency = currencyName(currencyId)
-        local units = math.floor((tonumber(amount) or 0) * 100 + 0.5)
-        local result = BanksEconomy.Issue({
-            toAccountId = wallets.value[currency].accountId,
+        local reserveId, missing = BankOrganizations.GetReserveAccountId(bankId, currency)
+        if not reserveId then error(missing or 'reserve_unavailable') end
+        local walletId = wallets.value[currency].accountId
+        local result = BanksEconomy.Transfer({
+            fromAccountId = toWallet and reserveId or walletId,
+            toAccountId = toWallet and walletId or reserveId,
             currency = currency,
-            amount = units,
+            amount = math.floor((tonumber(amount) or 0) * 100 + 0.5),
             actorCharacterId = identity.characterId,
-            reasonCode = reason or 'bank.wallet.credit',
-            referenceType = 'bcc_bank_wallet',
-            referenceId = identity.characterId,
-            idempotencyKey = ('banks:credit:%s'):format(MySQL.scalar.await('SELECT UUID()'))
+            reasonCode = reason,
+            referenceType = 'bcc_bank',
+            referenceId = tostring(bankId),
+            idempotencyKey = ('banks:%s:%s'):format(toWallet and 'credit' or 'debit', DB.value('SELECT UUID()'))
         })
-        if not result.ok then error(result.code or 'economy_credit_failed') end
+        if not result.ok then error(result.code or 'economy_transfer_failed') end
         return true
     end
-    function character.DebitWallet(currencyId, amount, reason)
-        local currency = currencyName(currencyId)
-        local units = math.floor((tonumber(amount) or 0) * 100 + 0.5)
-        local result = BanksEconomy.Destroy({
-            fromAccountId = wallets.value[currency].accountId,
-            currency = currency,
-            amount = units,
-            actorCharacterId = identity.characterId,
-            reasonCode = reason or 'bank.wallet.debit',
-            referenceType = 'bcc_bank_wallet',
-            referenceId = identity.characterId,
-            idempotencyKey = ('banks:debit:%s'):format(MySQL.scalar.await('SELECT UUID()'))
-        })
-        if not result.ok then error(result.code or 'economy_debit_failed') end
-        return true
+    function character.CreditWallet(currencyId, amount, reason, bankId)
+        return reserveTransfer(currencyId, amount, reason, bankId, true)
+    end
+    function character.DebitWallet(currencyId, amount, reason, bankId)
+        return reserveTransfer(currencyId, amount, reason, bankId, false)
     end
     return character
 end
 
--- Character wallets as seen by banks; balances come from Feather Economy.
-exports('GetBankingContext', GetBankingContext)
+-- Deliberately not exported: the returned CreditWallet/DebitWallet run inside
+-- bcc-banks, so Economy would authorize them as bank reserve transfers for any
+-- resource that obtained the context.
 
-MySQL.ready(function()
+CreateThread(function()
+    DB.awaitReady()
     local initialized = BanksEconomy.Initialize()
     if type(initialized) ~= 'table' or initialized.ok ~= true then
         error(('[bcc-banks] Economy initialization failed: %s'):format(

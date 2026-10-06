@@ -36,13 +36,54 @@ checks results.
   rules stay in bcc-banks.
 - Account-to-account transfers use `bank.transfer`; transfer fees move to the system
   sink as `bank.fee`.
-- Loans, checks, gold exchange and safety-deposit boxes have no counterparty account yet,
-  so they still create or destroy currency, but only under the allow-listed reason codes
-  in `Config.BankSupply` of feather-economy (Economy 0.1.4 requires a Core policy decision for
-  supply; `Config.Authorization.exemptBankSupply = true` exempts exactly these allow-listed
-  bank reasons, and setting it to false makes them need policy too) (`bank.loan.disbursement`,
-  `bank.loan.repayment`, `bank.check.issue`, `bank.check.cash`, `bank.gold.exchange`,
-  `bank.box.fee`, `bank.box.refund`, `bank.compensation`). This is an interim bridge.
+- Loans, checks, gold exchange and safety-deposit boxes settle against the branch reserve (see below).
+  `Config.BankSupply` of feather-economy now allows bcc-banks to create currency only for
+  `bank.migration.import` and operator `bank.reserve.funding`.
+
+## Bank administration (Authority)
+
+feather-roles is no longer used. `IsBankAdmin` resolves the player's active Core character and asks
+`exports['feather-authority']:Evaluate` for `staff.banks.manage`; any failure denies. It does not go through
+`feather-core:Authorize`, because Core's default policy provider is feather-admin, which denies actions it does not
+define. The server console is always allowed (`Config.Admin.allowConsole`).
+
+- Feather Admin Owners and Administrators are allowed through `GetStaffRole`, which reads the active character's current Authority assignment. Configure accepted role keys in `Config.Admin.staffRoles`; moderators are excluded by default.
+- On start (and whenever feather-authority restarts) `server/feather/authority.lua` registers the bcc-banks-owned
+  capability `staff.banks.manage`, creates the staff role `staff.banks.admin`, and grants the capability to it.
+  All steps are idempotent.
+- `BccBanksAdminGrant <server id>` / `BccBanksAdminRevoke <server id>` (console only) assign or clear that role for
+  the player's active character through `ReplaceOwnedStaffAssignment`, which only touches roles bcc-banks owns.
+- This needs `bcc-banks` in every `Config.Access` trust list of `feather-authority/config.lua` (reader, capability
+  registrar, role creator, grantor, assigner). Authority's grantor/assigner trust is not limited to owned roles, so
+  bank-specific console commands remain restricted to bank-owned roles. Old account assignments are not used; grant the role again for the desired character. Revoking a bank-specific assignment does not remove access granted by an accepted Feather Admin role.
+
+## Branch organizations and reserves
+
+Every row in `bcc_banks` is a Feather Organization (type `business`, key `bcc_bank_<id>`), linked through
+`bcc_banks.organization_id`. `server/feather/organizations.lua` creates, activates and links the organization on start
+(and for banks created in game), then calls Economy `EnsureBankReserve`, which permanently binds that organization's
+treasuries as a bcc-banks reserve.
+
+Bank products move money between customers and their branch reserve with ordinary Economy transfers:
+
+| Product | Into reserve | Out of reserve |
+|---|---|---|
+| Loans | `bank.loan.repayment` (account or wallet) | `bank.loan.disbursement` |
+| Checks | `bank.check.issue` (writer's account) | `bank.check.cash` (from the writer's branch), void refund |
+| Safety-deposit boxes | `bank.box.fee` | `bank.box.refund` |
+| Gold exchange (branch the player stands at) | `bank.gold.exchange` | `bank.gold.exchange` |
+| Rollbacks | | `bank.compensation` |
+
+Economy accepts these reasons only against a treasury bound to the calling resource, so bcc-banks cannot touch a shop or
+government treasury. A reserve starts empty and cannot pay out more than it holds. Capitalize a branch from the console:
+
+```text
+BccBanksReserveStatus                                 list branches, organizations and reserve balances
+BccBanksReserveFund <bank id> <dollars|gold> <amount> create funds in a branch reserve (bank.reserve.funding)
+```
+
+Trust entries this needs: `bcc-banks` in feather-organizations `trustedCreators`/`trustedMutators`/`trustedReaders`,
+and `Config.servicePolicy['feather-organizations']['bcc-banks']` (create, update) in feather-admin.
 
 ## One-time migration from the temporary economy
 
@@ -62,8 +103,8 @@ balance. Until it has run, accounts show no balance and money operations fail cl
 
 ## Remaining work
 
-1. Give loans, checks and gold exchange real counterparty accounts (a bank reserve or
-   organization treasury) and remove the interim supply reasons.
+1. Done: branch reserves replace the interim supply reasons. Next: let bank staff manage their
+   branch reserve in game, and move loan obligations to feather-contracts when it exists.
 2. Vendor the Audit producer kit, validate pending facts, and enable delivery.
 3. Run the live concurrency, restart and idempotency tests against the real ledger.
 4. Revalidate the menu adapter when Feather Menu v2 moves beyond `2.0.0-alpha.4`.

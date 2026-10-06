@@ -133,8 +133,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:WriteCheck', function(params, cb,
             firstName, lastName
         )
         if not itemCreated then
-            MySQL.update.await('UPDATE `bcc_checks` SET `status` = "voided" WHERE `id` = ? AND `status` = "pending"',
-                { result.check_id })
+            DB.exec('UPDATE `bcc_checks` SET `status` = "voided" WHERE `id` = ? AND `status` = "pending"',
+                result.check_id)
             DepositCash(accountId, amount, 'bank.compensation')
             NotifyClient(src, Feather.Locale.translateUpper('error_unable_write_check'), 'error', 4000)
             cb(false)
@@ -289,9 +289,12 @@ exports['feather-core']:RegisterRPC('bcc-banks:CashCheck', function(params, cb, 
         return
     end
 
-    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash') end)
+    -- Paid from the reserve of the branch that holds the writer's account.
+    local issuingAccount = GetAccount(result.account_id)
+    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash',
+        issuingAccount and issuingAccount.bank_id) end)
     if not credited then
-        MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', { checkId })
+        DB.exec('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', checkId)
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -430,9 +433,12 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
         return
     end
 
-    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash') end)
+    -- Paid from the reserve of the branch that holds the writer's account.
+    local issuingAccount = GetAccount(result.account_id)
+    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash',
+        issuingAccount and issuingAccount.bank_id) end)
     if not credited then
-        MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', { checkId })
+        DB.exec('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', checkId)
         ReleasePlayerFinancialLock(src)
         return
     end

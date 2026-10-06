@@ -25,8 +25,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateBank', function(params, res
         return
     end
 
-    local bankId = MySQL.scalar.await('SELECT UUID()')
-    local ok = MySQL.query.await('INSERT INTO `bcc_banks` (id, name, x, y, z, h) VALUES (?, ?, ?, ?, ?, ?);', { bankId, name, x, y, z, heading })
+    local bankId = DB.value('SELECT UUID()')
+    local ok = DB.exec('INSERT INTO `bcc_banks` (id, name, x, y, z, h) VALUES (?, ?, ?, ?, ?, ?);', bankId, name, x, y, z, heading)
     if ok == nil then
         NotifyClient(src, Feather.Locale.translateUpper('admin_action_failed') or 'Action failed.', 'error', 3500)
         res(false)
@@ -34,6 +34,11 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateBank', function(params, res
     end
     NotifyClient(src, 'Bank created: ' .. name, 'success', 3000)
     res(true)
+    -- Give the new branch its organization and reserve.
+    local provisioned = BankOrganizations.Ensure({ id = bankId, name = name })
+    if not provisioned.ok then
+        print(('[bcc-banks] organizations: new bank %s has no reserve: %s'):format(bankId, tostring(provisioned.code)))
+    end
 end)
 
 exports['feather-core']:RegisterRPC('bcc-banks:GetBankerBusy', function(params, res, src)

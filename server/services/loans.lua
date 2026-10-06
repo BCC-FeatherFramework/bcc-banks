@@ -342,8 +342,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateLoan', function(params, cb,
     local res = CreateLoan(account_id, characterId, amount, interest, duration, bankId)
     if not res or res.status == false then
         if autoCreatedAccountId then
-            MySQL.query.await('DELETE FROM `bcc_accounts_access` WHERE `account_id` = ?', { autoCreatedAccountId })
-            MySQL.query.await('DELETE FROM `bcc_accounts` WHERE `id` = ? AND `cash` = 0 AND `gold` = 0', { autoCreatedAccountId })
+            DB.exec('DELETE FROM `bcc_accounts_access` WHERE `account_id` = ?', autoCreatedAccountId)
+            DB.exec('DELETE FROM `bcc_accounts` WHERE `id` = ? AND `cash` = 0 AND `gold` = 0', autoCreatedAccountId)
         end
         NotifyClient(src, res and res.message or Feather.Locale.translateUpper('error_unable_create_loan'), 'error', 4000)
         cb(false)
@@ -419,7 +419,7 @@ CreateThread(function()
         end
 
         -- Fetch approved, non-defaulted loans
-        local loans = MySQL.query.await('SELECT id, character_id, last_game_day, game_days_elapsed, due_game_days, status FROM `bcc_loans` WHERE `status` = "approved" AND `is_defaulted` = 0') or {}
+        local loans = DB.query('SELECT id, character_id, last_game_day, game_days_elapsed, due_game_days, status FROM `bcc_loans` WHERE `status` = "approved" AND `is_defaulted` = 0') or {}
         for _, ln in ipairs(loans) do
             local last = tonumber(ln.last_game_day or curDay)
             local elapsed = tonumber(ln.game_days_elapsed or 0)
@@ -427,7 +427,7 @@ CreateThread(function()
             if last ~= curDay then
                 local delta = (curDay - last) % 7
                 local newElapsed = elapsed + delta
-                MySQL.query.await('UPDATE `bcc_loans` SET `game_days_elapsed` = ?, `last_game_day` = ? WHERE `id` = ?', { newElapsed, curDay, ln.id })
+                DB.exec('UPDATE `bcc_loans` SET `game_days_elapsed` = ?, `last_game_day` = ? WHERE `id` = ?', newElapsed, curDay, ln.id)
 
                 local info = ComputeLoanOutstanding(ln.id)
                 if info then
@@ -448,7 +448,7 @@ CreateThread(function()
                             BccBanksInternal.sendMailToCharacter(ln.character_id, fromName, subject, body)
                         end
                         -- Mark defaulted and freeze all accounts for owner
-                        MySQL.query.await('UPDATE `bcc_loans` SET `is_defaulted` = 1, `status` = "defaulted" WHERE `id` = ?', { ln.id })
+                        DB.exec('UPDATE `bcc_loans` SET `is_defaulted` = 1, `status` = "defaulted" WHERE `id` = ?', ln.id)
                         SetOwnerAccountsFrozen(ln.character_id, true)
                     end
                 end
@@ -563,7 +563,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:RepayLoan', function(params, cb, 
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(0, amount, 'bank.loan.repayment') end)
+    local removed = pcall(function() char.DebitWallet(0, amount, 'bank.loan.repayment',
+        loanRow.bank_id or GetNearbyBankId(src)) end)
     if not removed then
         ReleasePlayerFinancialLock(src)
         ActiveLoanRepayments[loan_id] = nil
@@ -579,11 +580,11 @@ exports['feather-core']:RegisterRPC('bcc-banks:RepayLoan', function(params, cb, 
     -- If fully repaid now, mark loan as paid
     local after = ComputeLoanOutstanding(loan_id)
     if after and (after.outstanding or 0) <= 0 then
-        MySQL.query.await('UPDATE `bcc_loans` SET `status` = "paid", `is_defaulted` = 0 WHERE `id` = ?', { loan_id })
+        DB.exec('UPDATE `bcc_loans` SET `status` = "paid", `is_defaulted` = 0 WHERE `id` = ?', loan_id)
         if loanRow and loanRow.character_id then
-            local remainingDefaults = MySQL.scalar.await(
+            local remainingDefaults = DB.value(
                 'SELECT COUNT(*) FROM `bcc_loans` WHERE `character_id` = ? AND (`status` = "defaulted" OR `is_defaulted` = 1)',
-                { loanRow.character_id }
+                loanRow.character_id
             )
             if (tonumber(remainingDefaults) or 0) == 0 then
                 SetOwnerAccountsFrozen(loanRow.character_id, false)

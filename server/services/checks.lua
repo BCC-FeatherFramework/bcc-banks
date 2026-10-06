@@ -36,10 +36,10 @@ function CreateCheck(accountId, issuerCharId, recipientCharId, amount, memo)
         return { status = false, message = 'Insufficient funds.' }
     end
 
-    local checkId = MySQL.scalar.await('SELECT UUID()')
-    local inserted = MySQL.insert.await(
+    local checkId = DB.value('SELECT UUID()')
+    local inserted = DB.insert(
         'INSERT INTO `bcc_checks` (`id`, `account_id`, `issuer_character_id`, `recipient_character_id`, `amount`, `memo`, `status`) VALUES (?, ?, ?, ?, ?, ?, "pending")',
-        { checkId, accountId, issuerCharId, recipientCharId, amount, tostring(memo or ''):sub(1, 200) }
+        checkId, accountId, issuerCharId, recipientCharId, amount, tostring(memo or ''):sub(1, 200)
     )
     if not inserted then
         DepositCash(accountId, amount, 'bank.compensation')
@@ -58,27 +58,27 @@ function CreateCheck(accountId, issuerCharId, recipientCharId, amount, memo)
 end
 
 function GetCheck(checkId)
-    local row = MySQL.query.await('SELECT * FROM `bcc_checks` WHERE `id` = ? LIMIT 1', { checkId })
+    local row = DB.query('SELECT * FROM `bcc_checks` WHERE `id` = ? LIMIT 1', checkId)
     return row and row[1]
 end
 
 function GetPendingChecksForRecipient(characterId)
-    local rows = MySQL.query.await(
+    local rows = DB.query(
         [[SELECT c.* FROM `bcc_checks` c
           WHERE c.recipient_character_id = ? AND c.status = "pending"
           ORDER BY c.created_at DESC]],
-        { characterId }
+        characterId
     )
     for _, row in ipairs(rows or {}) do row.issuer_first, row.issuer_last = GetCharacterName(row.issuer_character_id) end
     return rows or {}
 end
 
 function GetPendingChecksFromAccount(accountId)
-    local rows = MySQL.query.await(
+    local rows = DB.query(
         [[SELECT c.* FROM `bcc_checks` c
           WHERE c.account_id = ? AND c.status = "pending"
           ORDER BY c.created_at DESC]],
-        { accountId }
+        accountId
     )
     for _, row in ipairs(rows or {}) do row.recipient_first, row.recipient_last = GetCharacterName(row.recipient_character_id) end
     return rows or {}
@@ -105,9 +105,9 @@ function CashCheck(checkId, characterId)
         return { status = false, message = 'not_yours' }
     end
 
-    local changed = MySQL.update.await(
+    local changed = DB.exec(
         'UPDATE `bcc_checks` SET `status` = "cashed", `cashed_at` = NOW() WHERE `id` = ? AND `status` = "pending" AND `recipient_character_id` = ?',
-        { checkId, characterId }
+        checkId, characterId
     )
     if (tonumber(changed) or 0) ~= 1 then
         return { status = false, message = 'already_cashed' }
@@ -132,16 +132,16 @@ function VoidCheck(checkId, characterId)
         return { status = false, message = 'no_permission' }
     end
 
-    local changed = MySQL.update.await(
+    local changed = DB.exec(
         'UPDATE `bcc_checks` SET `status` = "voided" WHERE `id` = ? AND `status` = "pending"',
-        { checkId }
+        checkId
     )
     if (tonumber(changed) or 0) ~= 1 then
         return { status = false, message = 'Cannot void a check that is not pending.' }
     end
 
     if not DepositCash(check.account_id, tonumber(check.amount), 'bank.check.cash') then
-        MySQL.update.await('UPDATE `bcc_checks` SET `status` = "pending" WHERE `id` = ? AND `status` = "voided"', { checkId })
+        DB.exec('UPDATE `bcc_checks` SET `status` = "pending" WHERE `id` = ? AND `status` = "voided"', checkId)
         return { status = false, message = 'Unable to refund check.' }
     end
     AddAccountTransaction(

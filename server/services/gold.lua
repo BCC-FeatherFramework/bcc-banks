@@ -7,8 +7,10 @@ local function getRates()
     return buy, sell
 end
 
-local function canUseGoldExchange(src)
-    return Config.GoldExchange and Config.GoldExchange.Enabled == true and IsPlayerNearBank(src)
+-- The branch the player is exchanging at; its reserve pays and receives.
+local function goldExchangeBank(src)
+    if not (Config.GoldExchange and Config.GoldExchange.Enabled == true) then return nil end
+    return GetNearbyBankId(src)
 end
 
 local function roundTo(value, decimals)
@@ -28,7 +30,8 @@ end)
 exports['feather-core']:RegisterRPC('bcc-banks:BuyGold', function(params, cb, src)
     devPrint('BuyGold RPC called. src=', src, 'params=', params)
 
-    if not canUseGoldExchange(src) then
+    local bankId = goldExchangeBank(src)
+    if not bankId then
         NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
@@ -87,10 +90,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:BuyGold', function(params, cb, sr
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(0, cost, 'bank.gold.exchange') end)
-    local credited = removed and pcall(function() char.CreditWallet(1, gold, 'bank.gold.exchange') end)
+    local removed = pcall(function() char.DebitWallet(0, cost, 'bank.gold.exchange', bankId) end)
+    local credited = removed and pcall(function() char.CreditWallet(1, gold, 'bank.gold.exchange', bankId) end)
     if not credited then
-        if removed then pcall(function() char.CreditWallet(0, cost, 'bank.compensation') end) end
+        if removed then pcall(function() char.CreditWallet(0, cost, 'bank.compensation', bankId) end) end
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -116,7 +119,8 @@ end)
 exports['feather-core']:RegisterRPC('bcc-banks:SellGold', function(params, cb, src)
     devPrint('SellGold RPC called. src=', src, 'params=', params)
 
-    if not canUseGoldExchange(src) then
+    local bankId = goldExchangeBank(src)
+    if not bankId then
         NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
@@ -175,10 +179,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:SellGold', function(params, cb, s
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(1, gold, 'bank.gold.exchange') end)
-    local credited = removed and pcall(function() char.CreditWallet(0, proceeds, 'bank.gold.exchange') end)
+    local removed = pcall(function() char.DebitWallet(1, gold, 'bank.gold.exchange', bankId) end)
+    local credited = removed and pcall(function() char.CreditWallet(0, proceeds, 'bank.gold.exchange', bankId) end)
     if not credited then
-        if removed then pcall(function() char.CreditWallet(1, gold, 'bank.compensation') end) end
+        if removed then pcall(function() char.CreditWallet(1, gold, 'bank.compensation', bankId) end) end
         ReleasePlayerFinancialLock(src)
         cb(false)
         return
@@ -203,7 +207,8 @@ end)
 exports['feather-core']:RegisterRPC('bcc-banks:ExchangeGoldBars', function(params, cb, src)
     devPrint('ExchangeGoldBars RPC called. src=', src, 'params=', params)
 
-    if not canUseGoldExchange(src) then
+    local bankId = goldExchangeBank(src)
+    if not bankId then
         NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
@@ -252,7 +257,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:ExchangeGoldBars', function(param
     local grossGold = perBarGold * count
     local netGold = roundTo(grossGold * (1 - (feePercent / 100)), 2)
     if netGold < 0 then netGold = 0 end
-    local credited = pcall(function() char.CreditWallet(1, netGold, 'bank.gold.exchange') end)
+    local credited = pcall(function() char.CreditWallet(1, netGold, 'bank.gold.exchange', bankId) end)
     if not credited then
         inventory.Items.AddItem(itemName, count, nil, src)
         ReleasePlayerFinancialLock(src)

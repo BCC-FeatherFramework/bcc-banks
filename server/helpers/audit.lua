@@ -58,25 +58,25 @@ end
 
 local function getBankName(bankId)
     if bankId == nil or bankId == '' then return 'Unknown' end
-    local rows = MySQL.query.await('SELECT `name` FROM `bcc_banks` WHERE `id` = ? LIMIT 1', { tostring(bankId) })
+    local rows = DB.query('SELECT `name` FROM `bcc_banks` WHERE `id` = ? LIMIT 1', tostring(bankId))
     local row = rows and rows[1] or nil
     return (row and row.name) or tostring(bankId)
 end
 
 local function getAccountSummary(accountId)
     if accountId == nil or accountId == '' then return nil end
-    local rows = MySQL.query.await(
+    local rows = DB.query(
         'SELECT `id`, `name`, `account_number`, `bank_id`, `owner_id`, `cash`, `gold` FROM `bcc_accounts` WHERE `id` = ? LIMIT 1',
-        { tostring(accountId) }
+        tostring(accountId)
     )
     return rows and rows[1] or nil
 end
 
 local function getSDBSummary(sdbId)
     if sdbId == nil or sdbId == '' then return nil end
-    local rows = MySQL.query.await(
+    local rows = DB.query(
         'SELECT `id`, `name`, `bank_id`, `owner_id`, `size` FROM `bcc_safety_deposit_boxes` WHERE `id` = ? LIMIT 1',
-        { tostring(sdbId) }
+        tostring(sdbId)
     )
     return rows and rows[1] or nil
 end

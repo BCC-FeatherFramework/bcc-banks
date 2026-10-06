@@ -85,10 +85,15 @@ local function isBankOpenNow(bank)
 end
 
 function IsPlayerNearBank(src, bankId, extraDistance, requireOpen)
+    return GetNearbyBankId(src, bankId, extraDistance, requireOpen) ~= nil
+end
+
+-- Id of the (open, unless requireOpen == false) branch the player is standing at.
+function GetNearbyBankId(src, bankId, extraDistance, requireOpen)
     local ped = GetPlayerPed(src)
-    if not ped or ped == 0 then return false end
+    if not ped or ped == 0 then return nil end
     local coords = GetEntityCoords(ped)
-    if not coords then return false end
+    if not coords then return nil end
 
     local maxDistance = tonumber((Config.PromptSettings and Config.PromptSettings.Distance) or 3.0) or 3.0
     maxDistance = maxDistance + (tonumber(extraDistance) or 2.0)
@@ -98,11 +103,11 @@ function IsPlayerNearBank(src, bankId, extraDistance, requireOpen)
             local bankCoords = vector3(tonumber(bank.x) or 0, tonumber(bank.y) or 0, tonumber(bank.z) or 0)
             if #(vector3(coords.x, coords.y, coords.z) - bankCoords) <= maxDistance
                 and (requireOpen == false or isBankOpenNow(bank)) then
-                return true
+                return bank.id
             end
         end
     end
-    return false
+    return nil
 end
 
 if Config.devMode then
@@ -110,7 +115,9 @@ if Config.devMode then
         local args = { ... }
         for i = 1, #args do
             if type(args[i]) == "table" then
-                args[i] = json.encode(args[i])
+                local ok, encoded = pcall(json.encode, args[i])
+                args[i] = ok and type(encoded) == "string" and encoded
+                    or ("[unserializable table: " .. tostring(encoded) .. "]")
             elseif args[i] == nil then
                 args[i] = "nil"
             else

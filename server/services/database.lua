@@ -2,37 +2,37 @@ BccBanksDatabaseReady = false
 
 CreateThread(function()
     local function ensureColumn(tableName, columnName, definition)
-        local rows = MySQL.query.await([[
+        local rows = DB.query([[
             SELECT COUNT(*) AS cnt
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = ?
               AND COLUMN_NAME = ?
-        ]], { tableName, columnName })
+        ]], tableName, columnName)
         local exists = rows and rows[1] and tonumber(rows[1].cnt or 0) > 0
         if not exists then
-            MySQL.query.await(('ALTER TABLE `%s` ADD COLUMN `%s` %s'):format(tableName, columnName, definition))
+            DB.exec(('ALTER TABLE `%s` ADD COLUMN `%s` %s'):format(tableName, columnName, definition))
         end
     end
 
     local function ensureColumnDefinition(tableName, columnName, definition)
-        local rows = MySQL.query.await([[
+        local rows = DB.query([[
             SELECT COUNT(*) AS cnt
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = ?
               AND COLUMN_NAME = ?
-        ]], { tableName, columnName })
+        ]], tableName, columnName)
         local exists = rows and rows[1] and tonumber(rows[1].cnt or 0) > 0
         if exists then
-            MySQL.query.await(('ALTER TABLE `%s` MODIFY COLUMN `%s` %s'):format(tableName, columnName, definition))
+            DB.exec(('ALTER TABLE `%s` MODIFY COLUMN `%s` %s'):format(tableName, columnName, definition))
         else
-            MySQL.query.await(('ALTER TABLE `%s` ADD COLUMN `%s` %s'):format(tableName, columnName, definition))
+            DB.exec(('ALTER TABLE `%s` ADD COLUMN `%s` %s'):format(tableName, columnName, definition))
         end
     end
 
     -- bcc_banks
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_banks` (
             `id` VARCHAR(36) NOT NULL,
             `name` VARCHAR(255) NOT NULL UNIQUE,
@@ -49,7 +49,7 @@ CreateThread(function()
     ]])
 
     -- Ensure column exists for existing installations (add if missing)
-    local col = MySQL.query.await([[
+    local col = DB.query([[
         SELECT COUNT(*) AS cnt
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -59,11 +59,13 @@ CreateThread(function()
     local hasCol = col and col[1] and tonumber(col[1].cnt or 0) or 0
     if hasCol == 0 then
         -- Add missing column with default false
-        MySQL.query.await([[ALTER TABLE `bcc_banks` ADD COLUMN `hours_active` BOOLEAN NOT NULL DEFAULT FALSE AFTER `blip`]])
+        DB.exec([[ALTER TABLE `bcc_banks` ADD COLUMN `hours_active` BOOLEAN NOT NULL DEFAULT FALSE AFTER `blip`]])
     end
+    -- Feather Organization that operates the branch and owns its reserve.
+    ensureColumn('bcc_banks', 'organization_id', 'CHAR(36) NULL')
 
     -- bcc_accounts (no FK to characters)
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_accounts` (
             `id` VARCHAR(36) NOT NULL,
             `account_number` CHAR(36) NOT NULL,
@@ -88,7 +90,7 @@ CreateThread(function()
     ensureColumn('bcc_accounts', 'gold_account_id', 'CHAR(36) NULL')
 
     -- bcc_accounts_access
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_accounts_access` (
             `account_id` VARCHAR(36) NOT NULL,
             `character_id` CHAR(36) NOT NULL,
@@ -103,7 +105,7 @@ CreateThread(function()
     ensureColumnDefinition('bcc_accounts_access', 'character_id', 'CHAR(36) NOT NULL')
 
     -- bcc_loans (no FK to characters)
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_loans` (
             `id` VARCHAR(36) NOT NULL,
             `account_id` VARCHAR(36) NULL,
@@ -152,7 +154,7 @@ CreateThread(function()
     ensureColumn('bcc_loans', 'updated_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
 
     -- bcc_loans_payments
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_loans_payments` (
             `id` VARCHAR(36) NOT NULL,
             `loan_id` VARCHAR(36) NOT NULL,
@@ -169,7 +171,7 @@ CreateThread(function()
     ]])
 
     -- bcc_loan_interest_rates (no FKs)
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_loan_interest_rates` (
             `character_id` CHAR(36) NOT NULL,
             `bank_id` VARCHAR(36) NOT NULL,
@@ -182,7 +184,7 @@ CreateThread(function()
     ensureColumnDefinition('bcc_loan_interest_rates', 'character_id', 'CHAR(36) NOT NULL')
 
     -- bcc_bank_interest_rates (per-bank base rate used by admin UI)
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_bank_interest_rates` (
             `bank_id` VARCHAR(36) NOT NULL,
             `interest` DOUBLE(15,2) NOT NULL,
@@ -192,7 +194,7 @@ CreateThread(function()
     ]])
 
     -- bcc_transactions (no FK to characters)
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_transactions` (
             `id` VARCHAR(36) NOT NULL,
             `account_id` VARCHAR(36),
@@ -212,7 +214,7 @@ CreateThread(function()
     ensureColumnDefinition('bcc_transactions', 'character_id', 'CHAR(36) NOT NULL')
 
     -- bcc_safety_deposit_boxes (no FK to characters)
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_safety_deposit_boxes` (
             `id` VARCHAR(36) NOT NULL,
             `name` VARCHAR(255) NOT NULL,
@@ -231,7 +233,7 @@ CreateThread(function()
     ensureColumnDefinition('bcc_safety_deposit_boxes', 'inventory_id', 'CHAR(40) NULL')
 
     -- bcc_safety_deposit_boxes_access
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_safety_deposit_boxes_access` (
             `safety_deposit_box_id` VARCHAR(36) NOT NULL,
             `character_id` CHAR(36) NOT NULL,
@@ -247,7 +249,7 @@ CreateThread(function()
     ensureColumnDefinition('bcc_safety_deposit_boxes_access', 'character_id', 'CHAR(36) NOT NULL')
 
     -- bcc_checks
-    MySQL.query.await([[
+    DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_checks` (
             `id` VARCHAR(36) NOT NULL,
             `account_id` VARCHAR(36) NOT NULL,
@@ -270,7 +272,7 @@ CreateThread(function()
     ensureColumnDefinition('bcc_checks', 'recipient_character_id', 'CHAR(36) NOT NULL')
 
     -- Optional seed
-    MySQL.query.await([[
+    DB.exec([[
         INSERT IGNORE INTO `bcc_banks` (`id`, `name`, `x`, `y`, `z`, `h`, `blip`, `hours_active`, `open_hour`, `close_hour`)
         VALUES 
         (UUID(), 'Valentine', -307.82, 773.96, 118.70, 2.88, -2128054417, 0, 7, 21),
