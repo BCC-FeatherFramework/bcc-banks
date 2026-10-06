@@ -180,6 +180,24 @@ function BanksEconomy.CreateAccount(request)
     return err('account_not_found', 'Economy did not return the requested bank account.')
 end
 
+-- Binds a branch organization's treasuries as that branch's reserve and returns
+-- them as a table keyed by currency: { dollars = account, gold = account }.
+function BanksEconomy.EnsureBankReserve(request)
+    request = type(request) == 'table' and request or {}
+    local result = invoke('EnsureBankReserve', { organizationId = request.organizationId }, contextFrom(request))
+    if not result.ok then return result end
+    local byCurrency = {}
+    for _, account in ipairs(result.value) do
+        if account.accountType == 'treasury' and account.status == 'open' then
+            byCurrency[account.currency] = account
+        end
+    end
+    if not byCurrency.dollars or not byCurrency.gold then
+        return err('invalid_provider_result', 'Economy did not return both reserve treasuries.')
+    end
+    return ok(byCurrency)
+end
+
 function BanksEconomy.GetSystemAccount(request)
     request = type(request) == 'table' and request or {}
     return invoke('GetSystemAccount', { currency = request.currency, accountType = request.accountType },

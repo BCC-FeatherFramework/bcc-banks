@@ -1,5 +1,5 @@
 local function getSDBBankId(sdbId)
-    local row = MySQL.single.await('SELECT `bank_id` FROM `bcc_safety_deposit_boxes` WHERE `id` = ? LIMIT 1', { sdbId })
+    local row = DB.one('SELECT `bank_id` FROM `bcc_safety_deposit_boxes` WHERE `id` = ? LIMIT 1', sdbId)
     return row and row.bank_id or nil
 end
 
@@ -112,7 +112,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, 
     -- try to charge first so we don't create resources the player can't pay for
     local charged = false
     local chargeOk, chargeErr = pcall(function()
-        char.DebitWallet(currencyId, price, 'bank.box.fee')
+        char.DebitWallet(currencyId, price, 'bank.box.fee', bank)
         charged = true
     end)
     if not chargeOk then
@@ -126,7 +126,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, 
     local ok, boxOrErr, szFromCtrl = pcall(CreateSDB, name, characterId, bank, resolvedKey)
     if not ok or boxOrErr == false then
         -- refund if DB failed
-        if charged then pcall(function() if char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund') end end) end
+        if charged then pcall(function() if char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund', bank) end end) end
         devPrint("CreateSDB DB failed:", tostring(ok and (szFromCtrl or "unknown") or boxOrErr))
         NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
         ReleasePlayerFinancialLock(src)
@@ -159,19 +159,19 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, 
             error(failure and (failure.message or failure.code) or 'Feather Inventory container registration failed')
         end
 
-        MySQL.update.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { registered.value.uuid, box.id })
-        MySQL.insert.await(
+        DB.exec('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', registered.value.uuid, box.id)
+        DB.exec(
             'INSERT INTO `bcc_safety_deposit_boxes_access` (`safety_deposit_box_id`, `character_id`, `level`) VALUES (?,?,?)',
-            { box.id, characterId, Config.AccessLevels.Admin }
+            box.id, characterId, Config.AccessLevels.Admin
         )
     end)
 
     if not invOk then
         -- rollback + refund
         pcall(function()
-            MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', { box.id })
-            MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', { box.id })
-            if charged and char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund') end
+            DB.exec('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', box.id)
+            DB.exec('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', box.id)
+            if charged and char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund', bank) end
         end)
         devPrint("CreateSDB: inventory registration failed:", tostring(invErr))
         NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
@@ -229,7 +229,7 @@ local function ensureSDBInventoryRegistered(boxId, inventoryId, displayName, siz
     local blacklist = (sizeCfg and sizeCfg.BlacklistItems and #sizeCfg.BlacklistItems > 0) and sizeCfg.BlacklistItems or nil
     local limit = tonumber(sizeCfg and sizeCfg.MaxWeight) or 100
 
-    local owner = MySQL.scalar.await('SELECT `owner_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1', { boxId })
+    local owner = DB.value('SELECT `owner_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1', boxId)
     local inventory = exports['feather-inventory'].initiate()
     local foreignKey = inventory.Inventory.RegisterForeignKey(
         'bcc_safety_deposit_boxes',
@@ -307,9 +307,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:OpenSDB', function(params, cb, sr
     end
 
     -- Always query our table name directly
-    local row = MySQL.query.await(
+    local row = DB.query(
         'SELECT `inventory_id`,`name`,`size`,`bank_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1;',
-        { sdbId }
+        sdbId
     )[1]
     if not row then
         devPrint("OpenSDB: SDB row not found for id", sdbId)
@@ -325,7 +325,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:OpenSDB', function(params, cb, sr
 
     local invUuid, invId = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
     if not row.inventory_id or row.inventory_id ~= invUuid then
-        MySQL.query.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { invUuid, sdbId })
+        DB.exec('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', invUuid, sdbId)
         row.inventory_id = invUuid
     end
 
@@ -362,9 +362,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:OpenSDB', function(params, 
         return
     end
 
-    local row = MySQL.query.await(
+    local row = DB.query(
         'SELECT `inventory_id`,`name`,`size` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1;',
-        { sdbId }
+        sdbId
     )
     row = row and row[1] or nil
     if not row then
@@ -375,7 +375,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:OpenSDB', function(params, 
 
     local invUuid, invId = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
     if not row.inventory_id or row.inventory_id ~= invUuid then
-        MySQL.query.await('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', { invUuid, sdbId })
+        DB.exec('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', invUuid, sdbId)
     end
     local temporary = exports['feather-inventory'].initiate().Inventory.GrantTemporaryAccess(src, invId, 60)
     if type(temporary) ~= 'table' or temporary.ok ~= true then return cb(false) end
@@ -403,9 +403,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:GetSDBDeleteInfo', function(param
         return
     end
 
-    local row = MySQL.single.await(
+    local row = DB.one(
         'SELECT `id`,`name`,`bank_id`,`size`,`inventory_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1;',
-        { sdbId }
+        sdbId
     )
     if not row then
         cb(false)
@@ -452,9 +452,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:DeleteSDB', function(params, cb, 
         return
     end
 
-    local row = MySQL.single.await(
+    local row = DB.one(
         'SELECT `id`,`name`,`bank_id`,`size`,`inventory_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1;',
-        { sdbId }
+        sdbId
     )
     if not row then
         NotifyClient(src, Feather.Locale.translateUpper('error_sdb_not_found'), 'error', 4000)
@@ -484,8 +484,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:DeleteSDB', function(params, cb, 
         return cb(false)
     end
 
-    MySQL.query.await('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', { sdbId })
-    local affected = MySQL.update.await('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', { sdbId })
+    DB.exec('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', sdbId)
+    local affected = DB.exec('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', sdbId)
     if not affected or affected < 1 then
         NotifyClient(src, Feather.Locale.translateUpper('failed_delete_sdb'), 'error', 4000)
         cb(false)
@@ -632,10 +632,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:AddSDBAccess', function(params, c
     end
 
     -- Check if they already have access
-    local already = MySQL.query.await([[
+    local already = DB.query([[
         SELECT 1 FROM bcc_safety_deposit_boxes_access
         WHERE safety_deposit_box_id = ? AND character_id = ? LIMIT 1
-    ]], { sdbId, otherCharId })
+    ]], sdbId, otherCharId)
 
     if already and already[1] then
         devPrint("AddSDBAccess: Target already has access. sdbId=", sdbId, "charId=", otherCharId)
@@ -645,10 +645,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:AddSDBAccess', function(params, c
     end
 
     -- Insert access row
-    local success = MySQL.query.await([[
+    local success = DB.exec([[
         INSERT INTO bcc_safety_deposit_boxes_access (safety_deposit_box_id, character_id, level)
         VALUES (?, ?, ?)
-    ]], { sdbId, otherCharId, level })
+    ]], sdbId, otherCharId, level)
 
     devPrint("AddSDBAccess: Access granted. sdbId=", sdbId, "charId=", otherCharId, "level=", level)
     AddCharacterTransaction(requesterId, 0, 'sdb access - granted', 'Granted SDB #' .. tostring(sdbId) .. ' access to character #' .. tostring(otherCharId) .. ' level ' .. tostring(level))
@@ -681,7 +681,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:RemoveSDBAccess', function(params
     local requesterId = user.characterId
 
     local sdbId = NormalizeId(params and params.sdb_id)
-    local targetCharId = tonumber(params and params.character)
+    local targetCharId = NormalizeId(params and params.character)
 
     devPrint("Parsed inputs → sdbId:", sdbId, "target:", targetCharId, "requesterId:", requesterId)
 

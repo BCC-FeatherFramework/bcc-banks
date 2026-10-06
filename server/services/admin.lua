@@ -82,7 +82,7 @@ local function getBankNameForLoan(loan)
     end
     bankId = NormalizeId(bankId)
     if not bankId then return nil end
-    local row = MySQL.query.await('SELECT name FROM `bcc_banks` WHERE id = ? LIMIT 1', { bankId })
+    local row = DB.query('SELECT name FROM `bcc_banks` WHERE id = ? LIMIT 1', bankId)
     return row and row[1] and row[1].name or nil
 end
 
@@ -163,25 +163,9 @@ function IsBankAdmin(src)
         return true
     end
 
-    local resolved = exports['feather-roles']:GetActorRole(src)
-    if type(resolved) ~= 'table' or resolved.ok ~= true
-        or type(resolved.value) ~= 'table' or type(resolved.value.role) ~= 'table' then
-        devPrint('[ADMIN] Deny: Feather Roles could not resolve the active character role.',
-            type(resolved) == 'table' and resolved.code or 'invalid_result')
-        return false
-    end
-
-    local actorRole = resolved.value.role
-    for _, roleKey in ipairs(AdminCfg.roles or { 'admin', 'owner' }) do
-        if actorRole.key == roleKey then
-            devPrint('[ADMIN] Granting admin through Feather role:', actorRole.key,
-                'level=', actorRole.level, 'character=', resolved.value.characterId)
-            return true
-        end
-    end
-
-    devPrint('[ADMIN] Deny: Feather role is not allowed:', actorRole.key, 'level=', actorRole.level)
-    return false
+    local allowed, reason = BankAuthority.IsAllowed(src)
+    devPrint('[ADMIN]', allowed and 'Granting' or 'Deny:', BankAuthority.CapabilityKey(), 'reason=', reason)
+    return allowed
 end
 
 exports['feather-core']:RegisterRPC('bcc-banks:CheckAdmin', function(_, cb, src)
@@ -212,7 +196,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetBankRate', function(para
         cb(false)
         return
     end
-    local row = MySQL.query.await('SELECT interest FROM `bcc_bank_interest_rates` WHERE bank_id = ? LIMIT 1', { bankId })
+    local row = DB.query('SELECT interest FROM `bcc_bank_interest_rates` WHERE bank_id = ? LIMIT 1', bankId)
     local rate = row and row[1] and row[1].interest
     cb(true, rate and tonumber(rate) or nil)
 end)
@@ -232,7 +216,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetBankRate', function(para
         cb(false)
         return
     end
-    MySQL.query.await('INSERT INTO `bcc_bank_interest_rates` (bank_id, interest) VALUES (?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', { bankId, rate })
+    DB.exec('INSERT INTO `bcc_bank_interest_rates` (bank_id, interest) VALUES (?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', bankId, rate)
     cb(true)
 end)
 
@@ -255,9 +239,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetCharRate', function(para
     local row
     if not bankId or bankId == '0' then
         -- Use bank_id = '0' to represent global rate
-        row = MySQL.query.await('SELECT interest FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ? LIMIT 1', { charId, '0' })
+        row = DB.query('SELECT interest FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ? LIMIT 1', charId, '0')
     else
-        row = MySQL.query.await('SELECT interest FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ? LIMIT 1', { charId, bankId })
+        row = DB.query('SELECT interest FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ? LIMIT 1', charId, bankId)
     end
     local rate = row and row[1] and row[1].interest
     cb(true, rate and tonumber(rate) or nil)
@@ -281,9 +265,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetCharRate', function(para
     end
     if not bankId or bankId == '0' then
         -- Store global rate with bank_id = '0'
-        MySQL.query.await('INSERT INTO `bcc_loan_interest_rates` (character_id, bank_id, interest) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', { charId, '0', rate })
+        DB.exec('INSERT INTO `bcc_loan_interest_rates` (character_id, bank_id, interest) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', charId, '0', rate)
     else
-        MySQL.query.await('INSERT INTO `bcc_loan_interest_rates` (character_id, bank_id, interest) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', { charId, bankId, rate })
+        DB.exec('INSERT INTO `bcc_loan_interest_rates` (character_id, bank_id, interest) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', charId, bankId, rate)
     end
     cb(true)
 end)
@@ -305,9 +289,9 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ClearCharRate', function(pa
     end
     if not bankId or bankId == '0' then
         -- Clear global rate stored with bank_id = '0'
-        MySQL.query.await('DELETE FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ?', { charId, '0' })
+        DB.exec('DELETE FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ?', charId, '0')
     else
-        MySQL.query.await('DELETE FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ?', { charId, bankId })
+        DB.exec('DELETE FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ?', charId, bankId)
     end
     cb(true)
 end)
@@ -351,7 +335,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListAccounts', function(par
         cb(false)
         return
     end
-    local rows = MySQL.query.await('SELECT id, name, owner_id, cash, gold FROM `bcc_accounts` WHERE bank_id = ? ORDER BY id DESC', { bankId })
+    local rows = DB.query('SELECT id, name, owner_id, cash, gold FROM `bcc_accounts` WHERE bank_id = ? ORDER BY id DESC', bankId)
     for _, row in ipairs(rows or {}) do
         local fn, ln = GetCharacterName(row.owner_id)
         row.owner_firstname = fn
@@ -376,7 +360,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListFrozenAccounts', functi
         return
     end
 
-    local rows = MySQL.query.await('SELECT id, name, owner_id, account_number, cash, gold FROM `bcc_accounts` WHERE bank_id = ? AND is_frozen = 1 ORDER BY id DESC', { bankId })
+    local rows = DB.query('SELECT id, name, owner_id, account_number, cash, gold FROM `bcc_accounts` WHERE bank_id = ? AND is_frozen = 1 ORDER BY id DESC', bankId)
     for _, row in ipairs(rows or {}) do
         local fn, ln = GetCharacterName(row.owner_id)
         row.owner_firstname = fn
@@ -402,7 +386,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetAccount', function(param
         return
     end
 
-    local row = MySQL.query.await('SELECT * FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
+    local row = DB.query('SELECT * FROM `bcc_accounts` WHERE id = ? LIMIT 1', accId)
     row = row and row[1] or nil
     if not row then
         cb(false)
@@ -445,7 +429,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:UnfreezeAccount', function(
         return
     end
 
-    local row = MySQL.query.await('SELECT owner_id, is_frozen FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
+    local row = DB.query('SELECT owner_id, is_frozen FROM `bcc_accounts` WHERE id = ? LIMIT 1', accId)
     row = row and row[1] or nil
     if not row then
         NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
@@ -462,7 +446,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:UnfreezeAccount', function(
     if ownerId then
         SetOwnerAccountsFrozen(ownerId, false)
     else
-        MySQL.query.await('UPDATE `bcc_accounts` SET `is_frozen` = 0 WHERE `id` = ?', { accId })
+        DB.exec('UPDATE `bcc_accounts` SET `is_frozen` = 0 WHERE `id` = ?', accId)
     end
 
     cb(true)
@@ -485,14 +469,14 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetAccountFrozen', function
         return
     end
 
-    local row = MySQL.query.await('SELECT id FROM `bcc_accounts` WHERE id = ? LIMIT 1', { accId })
+    local row = DB.query('SELECT id FROM `bcc_accounts` WHERE id = ? LIMIT 1', accId)
     if not row or not row[1] then
         NotifyClient(src, Feather.Locale.translateUpper('error_invalid_account_id') or 'Invalid account id', 'error', 3500)
         cb(false)
         return
     end
 
-    MySQL.query.await('UPDATE `bcc_accounts` SET `is_frozen` = ? WHERE `id` = ?', { shouldFreeze and 1 or 0, accId })
+    DB.exec('UPDATE `bcc_accounts` SET `is_frozen` = ? WHERE `id` = ?', shouldFreeze and 1 or 0, accId)
     cb(true, { is_frozen = shouldFreeze })
 end)
 
@@ -522,10 +506,19 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:DeleteAccount', function(pa
         return
     end
 
+    -- Balances live in Feather Economy (GetAccount reads them). Deleting the row
+    -- would leave that money in the ledger with no account pointing at it.
+    if (tonumber(row.cash) or 0) > 0 or (tonumber(row.gold) or 0) > 0 then
+        devPrint('[ADMIN] DeleteAccount refused: account still holds funds', accId, 'cash=', row.cash, 'gold=', row.gold)
+        NotifyClient(src, Feather.Locale.translateUpper('admin_account_has_funds'), 'error', 3500)
+        cb(false)
+        return
+    end
+
     devPrint('[ADMIN] DeleteAccount removing account', accId, 'owner=', row.owner_id, 'cash=', row.cash, 'gold=', row.gold)
-    MySQL.query.await('DELETE FROM `bcc_accounts_access` WHERE `account_id` = ?', { accId })
-    MySQL.query.await('DELETE FROM `bcc_transactions` WHERE `account_id` = ?', { accId })
-    MySQL.query.await('DELETE FROM `bcc_accounts` WHERE `id` = ?', { accId })
+    DB.exec('DELETE FROM `bcc_accounts_access` WHERE `account_id` = ?', accId)
+    DB.exec('DELETE FROM `bcc_transactions` WHERE `account_id` = ?', accId)
+    DB.exec('DELETE FROM `bcc_accounts` WHERE `id` = ?', accId)
 
     devPrint('[ADMIN] DeleteAccount success for', accId)
     cb(true)
@@ -545,7 +538,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListLoans', function(params
         cb(false)
         return
     end
-    local rows = MySQL.query.await([[ 
+    local rows = DB.query([[ 
         SELECT l.*, 
                a.name AS account_name,
                a.account_number AS account_number,
@@ -554,7 +547,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListLoans', function(params
         LEFT JOIN `bcc_accounts` AS a ON l.account_id = a.id
         WHERE l.bank_id = ?
         ORDER BY l.created_at DESC
-    ]], { bankId })
+    ]], bankId)
     attachLoanBorrowerNames(rows)
     enrichLoanFinancials(rows)
     cb(true, rows or {})
@@ -575,7 +568,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListPendingLoans', function
         cb(false)
         return
     end
-    local rows = MySQL.query.await([[ 
+    local rows = DB.query([[ 
         SELECT l.*, 
                a.name AS account_name,
                a.account_number AS account_number,
@@ -584,7 +577,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListPendingLoans', function
         LEFT JOIN `bcc_accounts` AS a ON l.account_id = a.id
         WHERE l.bank_id = ? AND LOWER(TRIM(l.status)) = 'pending'
         ORDER BY l.created_at DESC
-    ]], { bankId })
+    ]], bankId)
     attachLoanBorrowerNames(rows)
     enrichLoanFinancials(rows)
     cb(true, rows or {})
@@ -692,7 +685,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ListSDBs', function(params,
         cb(false)
         return
     end
-    local rows = MySQL.query.await('SELECT id, name, owner_id, size FROM `bcc_safety_deposit_boxes` WHERE bank_id = ? ORDER BY id DESC', { bankId })
+    local rows = DB.query('SELECT id, name, owner_id, size FROM `bcc_safety_deposit_boxes` WHERE bank_id = ? ORDER BY id DESC', bankId)
     cb(true, rows or {})
 end)
 
@@ -711,7 +704,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:GetHours', function(params,
         cb(false)
         return
     end
-    local row = MySQL.query.await('SELECT hours_active, open_hour, close_hour FROM `bcc_banks` WHERE id = ? LIMIT 1', { bankId })
+    local row = DB.query('SELECT hours_active, open_hour, close_hour FROM `bcc_banks` WHERE id = ? LIMIT 1', bankId)
     local data = row and row[1]
     if not data then
         cb(true, { hours_active = false, open_hour = nil, close_hour = nil })
@@ -747,10 +740,10 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetHours', function(params,
         actv = (active ~= 0) and 1 or 0
     else
         -- Keep current when not provided: fetch existing
-        local row = MySQL.query.await('SELECT hours_active FROM `bcc_banks` WHERE id = ? LIMIT 1', { bankId })
+        local row = DB.query('SELECT hours_active FROM `bcc_banks` WHERE id = ? LIMIT 1', bankId)
         actv = (row and row[1] and (row[1].hours_active == 1 or row[1].hours_active == true)) and 1 or 0
     end
-    MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ?, open_hour = ?, close_hour = ? WHERE id = ?', { actv, openH, closeH, bankId })
+    DB.exec('UPDATE `bcc_banks` SET hours_active = ?, open_hour = ?, close_hour = ? WHERE id = ?', actv, openH, closeH, bankId)
     -- Notify all clients to refresh bank data
     TriggerClientEvent('bcc-banks:Refresh', -1)
     local adminUser = GetBankingContext(src)
@@ -781,7 +774,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ToggleHours', function(para
         return
     end
     local actv = active and 1 or 0
-    MySQL.query.await('UPDATE `bcc_banks` SET hours_active = ? WHERE id = ?', { actv, bankId })
+    DB.exec('UPDATE `bcc_banks` SET hours_active = ? WHERE id = ?', actv, bankId)
     TriggerClientEvent('bcc-banks:Refresh', -1)
     local adminUser = GetBankingContext(src)
     local adminId = adminUser and adminUser.characterId or 'Unknown'

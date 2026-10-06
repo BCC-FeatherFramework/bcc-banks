@@ -22,10 +22,12 @@ client_scripts {
 }
 
 server_scripts {
-   '@feather-mysql/lib/MySQL.lua',
+   '@feather-mysql/lib/DB.lua',
    'server/feather/init.lua',
    'server/feather/economy.lua',
    'server/feather/migration.lua',
+   'server/feather/authority.lua',
+   'server/feather/organizations.lua',
    'languages/*.lua',
    'server/api-loader.lua',
    'server/helpers/*.lua',
@@ -41,10 +43,11 @@ dependencies {
    'feather-notify',
    'feather-character',
    'feather-economy',
-   'feather-roles',
+   'feather-authority',
+   'feather-organizations',
    'feather-inventory',
    'feather-menu-v2',
-   'bcc-chat',
+   'feather-chat',
 }
 
 files {

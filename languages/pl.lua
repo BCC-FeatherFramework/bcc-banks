@@ -289,6 +289,7 @@ Feather.Locale.register("pl", {
     admin_account_locked_status = "Status: Zablokowane",
     admin_account_unlocked_status = "Status: Aktywne",
     admin_invalid_account_freeze = "Nieprawidłowe konto/stan.",
+    admin_account_has_funds = "Konto nadal zawiera środki. Wypłać je przed usunięciem.",
     admin_delete_account_button = "Usuń konto",
     admin_delete_account_success = "Konto usunięte.",
     admin_delete_account_failed = "Nie udało się usunąć konta.",

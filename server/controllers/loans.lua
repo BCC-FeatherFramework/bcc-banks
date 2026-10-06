@@ -22,10 +22,10 @@ function CreateLoan(account_id, character_id, amount, interest, duration, bank_i
         day = tonumber(t.day) or 0
     end
 
-    local loanId = MySQL.scalar.await('SELECT UUID()')
-    local loanRows = MySQL.query.await(
+    local loanId = DB.value('SELECT UUID()')
+    local loanRows = DB.query(
         'INSERT INTO `bcc_loans` (id, account_id, bank_id, character_id, amount, interest, duration, status, last_game_day, game_days_elapsed, due_game_days) VALUES (?, ?, ?, ?, ?, ?, ?, \'pending\', ?, 0, ?) RETURNING *;',
-        { loanId, account_id, bank_id, character_id, amount, interest or 0, months, day, due_game_days }
+        loanId, account_id, bank_id, character_id, amount, interest or 0, months, day, due_game_days
     )
 
     local loan = loanRows and loanRows[1]
@@ -37,18 +37,18 @@ function CreateLoan(account_id, character_id, amount, interest, duration, bank_i
 end
 
 function GetLoan(loan_id)
-    local row = MySQL.query.await('SELECT * FROM `bcc_loans` WHERE `id` = ? LIMIT 1;', { loan_id })
+    local row = DB.query('SELECT * FROM `bcc_loans` WHERE `id` = ? LIMIT 1;', loan_id)
     return row and row[1]
 end
 
 function GetLoansForAccount(account_id)
-    local rows = MySQL.query.await('SELECT * FROM `bcc_loans` WHERE `account_id` = ? ORDER BY `created_at` DESC;', { account_id })
+    local rows = DB.query('SELECT * FROM `bcc_loans` WHERE `account_id` = ? ORDER BY `created_at` DESC;', account_id)
     return rows or {}
 end
 
 -- New: list loans by character and bank (no account)
 function GetLoansForCharacterBank(character_id, bank_id)
-    local rows = MySQL.query.await('SELECT * FROM `bcc_loans` WHERE `character_id` = ? AND `bank_id` = ? ORDER BY `created_at` DESC;', { character_id, bank_id })
+    local rows = DB.query('SELECT * FROM `bcc_loans` WHERE `character_id` = ? AND `bank_id` = ? ORDER BY `created_at` DESC;', character_id, bank_id)
     return rows or {}
 end
 
@@ -94,7 +94,8 @@ function RepayLoan(loan_id, account_id, character_id, amount)
     end
 
     -- Withdraw from account to repay the loan
-    local ok = WithdrawCash(account_id, amount, 'bank.loan.repayment')
+    local ok = WithdrawCash(account_id, amount, 'bank.loan.repayment',
+        info and info.loan and info.loan.bank_id)
     if not ok then
         return { status = false, message = 'Insufficient account funds.' }
     end
@@ -106,7 +107,7 @@ function RepayLoan(loan_id, account_id, character_id, amount)
     -- Mark loan paid if fully repaid
     local after = ComputeLoanOutstanding(loan_id)
     if after and (after.outstanding or 0) <= 0 then
-        MySQL.query.await('UPDATE `bcc_loans` SET `status` = "paid", `is_defaulted` = 0 WHERE `id` = ?', { loan_id })
+        DB.exec('UPDATE `bcc_loans` SET `status` = "paid", `is_defaulted` = 0 WHERE `id` = ?', loan_id)
         local ownerChar = (after.loan and after.loan.character_id) or (info and info.loan and info.loan.character_id) or character_id
         if ownerChar then
             SetOwnerAccountsFrozen(ownerChar, false)
@@ -137,9 +138,9 @@ function ApproveLoan(loan_id, approver_char_id)
         local t = exports.weathersync:getTime() or {}
         day = tonumber(t.day) or day or 0
     end
-    local reserved = MySQL.update.await(
+    local reserved = DB.exec(
         'UPDATE `bcc_loans` SET `status` = \'approved\', `approved_by` = ?, `approved_at` = NOW(), `last_game_day` = ? WHERE `id` = ? AND `status` = \'pending\'',
-        { approver_char_id, day, loan_id }
+        approver_char_id, day, loan_id
     )
     if (tonumber(reserved) or 0) ~= 1 then
         return { status = false, message = 'Loan is no longer pending.' }
@@ -148,17 +149,17 @@ function ApproveLoan(loan_id, approver_char_id)
     -- Disbursement: if account linked, deposit now; otherwise leave funds claimable.
     local amt = tonumber(loan.amount) or 0
     if loan.account_id then
-        local ok = DepositCash(loan.account_id, amt, 'bank.loan.disbursement')
+        local ok = DepositCash(loan.account_id, amt, 'bank.loan.disbursement', loan.bank_id)
         if not ok then
-            MySQL.update.await(
+            DB.exec(
                 'UPDATE `bcc_loans` SET `status` = \'pending\', `approved_by` = NULL, `approved_at` = NULL WHERE `id` = ? AND `disbursed_account_id` IS NULL',
-                { loan_id }
+                loan_id
             )
             return { status = false, message = 'Failed to disburse funds to account.' }
         end
         local disburseDesc = _U and Feather.Locale.translateUpper('loan_disbursement_desc') or 'Loan disbursed to account'
         AddLoanTransaction(loan.id, loan.character_id, amt, 'loan - disbursement', disburseDesc)
-        MySQL.query.await('UPDATE `bcc_loans` SET `disbursed_account_id` = ?, `disbursed_at` = NOW() WHERE `id` = ?', { loan.account_id, loan.id })
+        DB.exec('UPDATE `bcc_loans` SET `disbursed_account_id` = ?, `disbursed_at` = NOW() WHERE `id` = ?', loan.account_id, loan.id)
     else
         -- No immediate disbursement; player can claim to their chosen account later
     end
@@ -192,20 +193,20 @@ function ClaimLoanToAccount(loan_id, account_id, character_id)
     end
     -- Reserve the one-time claim before crediting the account. Only one concurrent
     -- request can change a NULL disbursement marker.
-    local reserved = MySQL.update.await(
+    local reserved = DB.exec(
         'UPDATE `bcc_loans` SET `disbursed_account_id` = ?, `disbursed_at` = NOW() WHERE `id` = ? AND `status` = \'approved\' AND `disbursed_account_id` IS NULL',
-        { account_id, loan.id }
+        account_id, loan.id
     )
     if (tonumber(reserved) or 0) ~= 1 then
         return { status = false, message = 'Loan funds already disbursed.' }
     end
 
     local amt = tonumber(loan.amount) or 0
-    local ok = DepositCash(account_id, amt, 'bank.loan.disbursement')
+    local ok = DepositCash(account_id, amt, 'bank.loan.disbursement', loan.bank_id)
     if not ok then
-        MySQL.update.await(
+        DB.exec(
             'UPDATE `bcc_loans` SET `disbursed_account_id` = NULL, `disbursed_at` = NULL WHERE `id` = ? AND `disbursed_account_id` = ?',
-            { loan.id, account_id }
+            loan.id, account_id
         )
         return { status = false, message = 'Unable to deposit into the selected account.' }
     end
@@ -221,7 +222,7 @@ function RejectLoan(loan_id, approver_char_id)
     if loan.status == 'approved' then
         return { status = false, message = 'Loan already approved.' }
     end
-    MySQL.query.await('UPDATE `bcc_loans` SET `status` = \'rejected\', `approved_by` = ?, `approved_at` = NOW() WHERE `id` = ?', { approver_char_id, loan_id })
+    DB.exec('UPDATE `bcc_loans` SET `status` = \'rejected\', `approved_by` = ?, `approved_at` = NOW() WHERE `id` = ?', approver_char_id, loan_id)
     local updated = GetLoan(loan_id)
     return { status = true, loan = updated }
 end
@@ -231,7 +232,7 @@ end
 function GetCharacterLoanInterest(character_id, bank_id)
     if not character_id then return 10.0 end
     local function queryRate(sql, params)
-        local ok, rows = pcall(MySQL.query.await, sql, params)
+        local ok, rows = pcall(DB.query, sql, table.unpack(params))
         if not ok then
             devPrint('Loan interest lookup failed:', tostring(rows))
             return nil

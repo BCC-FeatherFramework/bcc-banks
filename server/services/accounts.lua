@@ -120,7 +120,12 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateAccount', function(params, 
     local name = params and params.name
     local bank = NormalizeId(params and params.bank)
 
-    devPrint("Fetched character:", char)
+    devPrint("Fetched character:", {
+        characterId = char.characterId,
+        accountId = char.accountId,
+        firstName = char.firstName,
+        lastName = char.lastName
+    })
     devPrint("CreateAccount inputs -> name:", name, "bank:", bank, "characterId:", characterId)
 
     if not characterId then
@@ -440,7 +445,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:GiveAccountAccess', function(para
         cb(false)
         return
     end
-    otherCharacter = tonumber(otherCharacter)
+    otherCharacter = NormalizeId(otherCharacter)
 
     -- Permission check
     if not (IsAccountAdmin(account, requesterId) or IsAccountOwner(account, requesterId)) then
@@ -504,7 +509,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:RemoveAccountAccess', function(pa
     local requesterId = user.characterId
 
     local account = NormalizeId(params and params.account)
-    local target = tonumber(params and params.character)
+    local target = NormalizeId(params and params.character)
 
     devPrint("Parsed inputs → account:", account, "target:", target, "requesterId:", requesterId)
 
@@ -984,8 +989,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:TransferCash', function(params, c
         return
     end
 
-    -- Debit and credit in one SQL statement so concurrent requests cannot spend
-    -- the same source balance or leave a half-completed transfer.
+    -- One Economy transfer moves the amount; Economy rejects it if the source
+    -- cannot cover it. A cross-bank fee is a second transfer to the system sink.
     if not TransferAccountCash(fromAcc.id, toAcc.id, totalDebit, amount) then
         devPrint("Atomic transfer failed or source funds changed")
         NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_account_funds'), 'error', 4000)

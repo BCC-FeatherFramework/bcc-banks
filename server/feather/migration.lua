@@ -16,8 +16,8 @@ local MIGRATION_TABLE = 'bcc_banks_economy_migration'
 local REASON = 'bank.migration.import'
 
 local function tableExists(name)
-    local row = MySQL.single.await('SELECT COUNT(*) AS n FROM information_schema.TABLES '
-        .. 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', { name })
+    local row = DB.one('SELECT COUNT(*) AS n FROM information_schema.TABLES '
+        .. 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', name)
     return row and tonumber(row.n) == 1
 end
 
@@ -83,7 +83,7 @@ end
 
 local function loadInputs()
     if not tableExists(TEMP) then return nil end
-    local rows = MySQL.query.await([[SELECT a.account_id, a.owner_type, a.owner_id, a.account_type,
+    local rows = DB.query([[SELECT a.account_id, a.owner_type, a.owner_id, a.account_type,
             a.currency_code, a.status, b.posted_amount
         FROM bcc_banks_temp_economy_accounts a
         JOIN bcc_banks_temp_economy_balances b ON b.account_id = a.account_id]]) or {}
@@ -93,14 +93,14 @@ local function loadInputs()
             accountType = row.account_type, currency = row.currency_code, status = row.status,
             amount = tonumber(row.posted_amount) or 0 }
     end
-    local bccRows = MySQL.query.await('SELECT id, dollars_account_id, gold_account_id FROM bcc_accounts') or {}
+    local bccRows = DB.query('SELECT id, dollars_account_id, gold_account_id FROM bcc_accounts') or {}
     local bcc = {}
     for _, row in ipairs(bccRows) do
         bcc[#bcc + 1] = { id = row.id, dollarsAccountId = row.dollars_account_id, goldAccountId = row.gold_account_id }
     end
     local migrated = {}
     if tableExists(MIGRATION_TABLE) then
-        for _, row in ipairs(MySQL.query.await('SELECT temp_account_id, status, real_account_id, transaction_id, bcc_account_id FROM '
+        for _, row in ipairs(DB.query('SELECT temp_account_id, status, real_account_id, transaction_id, bcc_account_id FROM '
             .. MIGRATION_TABLE) or {}) do
             migrated[row.temp_account_id] = { status = row.status, realAccountId = row.real_account_id,
                 transactionId = row.transaction_id, bccAccountId = row.bcc_account_id }
@@ -136,7 +136,7 @@ function BanksEconomyMigration.Pending()
 end
 
 local function ensureMigrationTable()
-    MySQL.query.await([[CREATE TABLE IF NOT EXISTS bcc_banks_economy_migration (
+    DB.exec([[CREATE TABLE IF NOT EXISTS bcc_banks_economy_migration (
         temp_account_id CHAR(36) NOT NULL,
         kind VARCHAR(16) NOT NULL,
         currency VARCHAR(32) NOT NULL,
@@ -179,14 +179,14 @@ local function migrateItem(item)
             return false, 'verification_failed'
         end
     end
-    MySQL.insert.await([[INSERT INTO bcc_banks_economy_migration
+    DB.exec([[INSERT INTO bcc_banks_economy_migration
         (temp_account_id, kind, currency, owner_character_id, bcc_account_id, real_account_id, amount,
          status, transaction_id, migrated_at)
         VALUES (?,?,?,?,?,?,?,'migrated',?,NOW())
         ON DUPLICATE KEY UPDATE real_account_id = VALUES(real_account_id), status = 'migrated',
             transaction_id = VALUES(transaction_id), migrated_at = NOW()]],
-        { item.tempAccountId, item.kind, item.currency, item.ownerCharacterId, item.bccAccountId,
-          account.accountId, item.amount, transactionId })
+        item.tempAccountId, item.kind, item.currency, item.ownerCharacterId, item.bccAccountId,
+          account.accountId, item.amount, transactionId)
     return true, account.accountId
 end
 
@@ -203,9 +203,9 @@ local function relink(bcc, plan)
         end
         if mapping.dollars and mapping.gold
             and (account.dollarsAccountId ~= mapping.dollars or account.goldAccountId ~= mapping.gold) then
-            local changed = MySQL.update.await([[UPDATE bcc_accounts SET dollars_account_id = ?, gold_account_id = ?
+            local changed = DB.exec([[UPDATE bcc_accounts SET dollars_account_id = ?, gold_account_id = ?
                 WHERE id = ? AND dollars_account_id <=> ? AND gold_account_id <=> ?]],
-                { mapping.dollars, mapping.gold, account.id, account.dollarsAccountId, account.goldAccountId })
+                mapping.dollars, mapping.gold, account.id, account.dollarsAccountId, account.goldAccountId)
             if tonumber(changed) == 1 then linked = linked + 1 end
         end
     end
@@ -265,7 +265,8 @@ RegisterCommand('BccBanksEconomyMigrate', function(source, args)
     end
 end, true)
 
-MySQL.ready(function()
+CreateThread(function()
+    DB.awaitReady()
     local pending = BanksEconomyMigration.Pending()
     if pending > 0 then
         print(('[bcc-banks] WARNING: %d temporary-economy account(s) are not yet in Feather Economy. '
