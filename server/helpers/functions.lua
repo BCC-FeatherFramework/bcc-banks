@@ -124,7 +124,10 @@ if Config.devMode then
                 args[i] = tostring(args[i])
             end
         end
-        print("^1[DEV MODE] ^4" .. table.concat(args, " ") .. "^0")
+        -- One print per line, each ending with ^0 so the color never carries over.
+        for line in (table.concat(args, " ") .. "\n"):gmatch("(.-)\n") do
+            print("^1[DEV MODE] ^4" .. line .. "^0")
+        end
     end
 else
     function devPrint(...) end
