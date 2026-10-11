@@ -51,7 +51,8 @@ local function adaptElement(elementType, source, key)
     spec.key, spec.slot, spec.label = key, source.slot, source.label
     spec.disabled, spec.persist = source.disabled, source.persist
 
-    if elementType == 'textdisplay' and type(source.value) == 'table' then spec.value = plainText(source.value) end
+    -- Menu v2 shows text only: strip legacy HTML strings as well as line tables.
+    if elementType == 'textdisplay' then spec.value = plainText(source.value) end
     if (elementType == 'toggle' or elementType == 'checkbox') and spec.value == nil then spec.value = source.start == true end
 
     local legacyChoices
