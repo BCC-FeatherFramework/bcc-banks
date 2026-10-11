@@ -105,6 +105,7 @@ end
 local Menu = {}; Menu.__index = Menu
 
 function Menu:RegisterPage(key)
+    self:Ensure()
     local page = self.pages[key]
     if page then
         for _, elementId in ipairs(page.elements) do
@@ -122,16 +123,32 @@ end
 function Menu:Open(options)
     local page = options and options.startupPage
     result('AwaitReady', menuExport:AwaitReady(5000))
+    self:Ensure()
     return result('OpenMenu', menuExport:OpenMenu(self.menuId, { pageId = page and page.pageId or nil,
         keyboard = true, cursor = true, replace = true }))
 end
 
 function Menu:Close() return result('CloseMenu', menuExport:CloseMenu(self.menuId, {})) end
 
+-- feather-menu-v2 forgets every menu when it restarts ("Menu was not found").
+-- Recreate this one in place (new menuId, no cached pages) so code holding the
+-- menu object keeps working; pages are rebuilt by the next RegisterPage.
+function Menu:Ensure()
+    local called, state = pcall(function() return menuExport:GetMenuState(self.menuId) end)
+    if not called or type(state) ~= 'table' or state.ok or state.code ~= 'not_found' then return end
+    local value = result('CreateMenu', menuExport:CreateMenu(self.spec))
+    if not value then return end
+    self.menuId, self.pages = value.menuId, {}
+    if self.lifecycle then
+        result('RegisterMenuLifecycle', menuExport:RegisterMenuLifecycle(self.menuId, self.lifecycle))
+    end
+    print(('[%s] feather-menu-v2 lost the menu; it was recreated'):format(GetCurrentResourceName()))
+end
+
 function FeatherMenuV2Compat:RegisterMenu(key, source, callbacks)
     source = source or {}
     local contentStyle = source.contentslot and source.contentslot.style or {}
-    local value = result('CreateMenu', menuExport:CreateMenu({
+    local spec = {
         key = key, draggable = source.draggable ~= false, closable = source.canclose ~= false,
         persistPosition = false,
         position = { x = '13%', y = '50%' },
@@ -140,14 +157,16 @@ function FeatherMenuV2Compat:RegisterMenu(key, source, callbacks)
             breakpoints = { ['720'] = source['720width'] or '400px', ['1080'] = source['1080width'] or '500px',
                 ['1440'] = source['2kwidth'] or '600px', ['2160'] = source['4kwidth'] or '800px' } },
         focus = { keyboard = true, cursor = true },
-    }))
+    }
+    local value = result('CreateMenu', menuExport:CreateMenu(spec))
     if not value then return nil end
-    local menu = setmetatable({ menuId = value.menuId, pages = {} }, Menu)
+    local menu = setmetatable({ menuId = value.menuId, pages = {}, spec = spec }, Menu)
     if callbacks then
-        result('RegisterMenuLifecycle', menuExport:RegisterMenuLifecycle(menu.menuId, function(event)
+        menu.lifecycle = function(event)
             if event.event == 'opened' and callbacks.opened then callbacks.opened(event) end
             if event.event == 'closed' and callbacks.closed then callbacks.closed(event) end
-        end))
+        end
+        result('RegisterMenuLifecycle', menuExport:RegisterMenuLifecycle(menu.menuId, menu.lifecycle))
     end
     return menu
 end
