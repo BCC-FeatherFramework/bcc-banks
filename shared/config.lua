@@ -1,5 +1,5 @@
 Config = {
-	devMode            = true,
+	devMode            = false,
 	Notify             = "feather-notify", -- Feather port notification provider
 	UseBankerBusy      = true,        -- If enabled only 1 person can use the bank at a time
 
@@ -12,7 +12,13 @@ Config = {
         command = 'bankadmin',
         capability = 'staff.banks.manage',
         role = 'staff.banks.admin',
-        staffRoles = { 'staff.admin.owner', 'staff.admin.administrator' }
+        -- Feather Admin capabilities that also count as staff here. staff.admin.audit.search
+        -- is held by Admin administrators and owners (feather-admin configs/permissions.lua).
+        staffCapabilities = { 'staff.admin.audit.search' },
+        -- feather-jobs job keys whose holders also administer banks ({} to disable). The job
+        -- must be registered in feather-jobs by its owner, for example as a bcc-society job type.
+        jobs = { 'banker' },
+        jobRequireOnDuty = true -- only while that job is on duty
     },
 
 	-- https://github.com/femga/rdr3_discoveries/blob/master/Controls/README.md

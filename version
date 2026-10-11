@@ -1,3 +1,9 @@
+<2.0.0>
+- Feather Framework port: money in feather-economy (bank accounts and branch reserves),
+  branches as feather-organizations businesses, staff through feather-authority.
+- Fixed: Feather Admin administrators and owners were denied bank administration.
+- Added: bank administration by feather-jobs job (`Config.Admin.jobs`, default `banker`).
+- Added: `BanksReleaseSmokeTest` (read-only release check).
 <1.6.0>
 - Removed raw account UUID and bank UUID from the account details menu.
 - Added an admin button to view account transactions.

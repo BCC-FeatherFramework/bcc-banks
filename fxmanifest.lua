@@ -3,7 +3,7 @@ rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aw
 
 game 'rdr3'
 lua54 'yes'
-version '1.6.0'
+version '2.0.0'
 author 'BCC Scripts'
 
 shared_scripts {
@@ -28,6 +28,7 @@ server_scripts {
    'server/feather/migration.lua',
    'server/feather/authority.lua',
    'server/feather/organizations.lua',
+   'server/feather/smoke.lua',
    'languages/*.lua',
    'server/api-loader.lua',
    'server/helpers/*.lua',

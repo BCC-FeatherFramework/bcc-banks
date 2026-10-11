@@ -99,14 +99,19 @@ function BankAuthority.IsAllowed(src)
         or type(session.value.characterId) ~= 'string' then
         return false, 'unauthenticated'
     end
-    if GetResourceState('feather-admin') == 'started' then
-        local called, staff = pcall(function()
-            return exports['feather-admin']:GetStaffRole(src)
-        end)
-        if called and type(staff) == 'table' and staff.ok == true and type(staff.value) == 'table' then
-            for _, allowedRole in ipairs(adminConfig().staffRoles or {}) do
-                if staff.value.roleKey == allowedRole then return true, 'authority_staff_role' end
-            end
+    -- Feather Admin staff: Admin grants its roles capabilities named
+    -- staff.admin.<action>. A character holding one of the configured ones (by
+    -- default one that only administrators and owners get) is allowed.
+    for _, capability in ipairs(adminConfig().staffCapabilities or {}) do
+        local staff = exports['feather-authority']:Evaluate({
+            subjectType = 'character',
+            subjectId = session.value.characterId,
+            capabilityKey = capability,
+            scopeType = 'server'
+        })
+        if type(staff) == 'table' and staff.ok == true and type(staff.value) == 'table'
+            and staff.value.allowed == true then
+            return true, 'admin_staff:' .. capability
         end
     end
     local decision = exports['feather-authority']:Evaluate({
@@ -115,10 +120,31 @@ function BankAuthority.IsAllowed(src)
         capabilityKey = BankAuthority.CapabilityKey(),
         scopeType = 'server'
     })
-    if type(decision) ~= 'table' or decision.ok ~= true or type(decision.value) ~= 'table' then
-        return false, type(decision) == 'table' and decision.code or 'invalid_result'
+    if type(decision) == 'table' and decision.ok == true and type(decision.value) == 'table'
+        and decision.value.allowed == true then
+        return true, decision.value.reason
     end
-    return decision.value.allowed == true, decision.value.reason
+    local job = BankAuthority.MatchingJob(session.value.characterId)
+    if job then return true, 'job:' .. job end
+    return false, type(decision) == 'table' and (decision.ok and decision.value.reason or decision.code) or 'invalid_result'
+end
+
+-- Characters holding one of Config.Admin.jobs (feather-jobs job keys) also
+-- administer banks, as the original bcc-banks allowed for its banker job.
+-- Fails closed when feather-jobs is not running or does not know the job.
+function BankAuthority.MatchingJob(characterId)
+    local jobs = adminConfig().jobs
+    if type(jobs) ~= 'table' or #jobs == 0 or GetResourceState('feather-jobs') ~= 'started' then return nil end
+    for _, jobKey in ipairs(jobs) do
+        local request = { characterId = characterId, jobKey = jobKey }
+        if adminConfig().jobRequireOnDuty then request.dutyState = 'on_duty' end
+        local called, result = pcall(function() return exports['feather-jobs']:CheckAssignment(request) end)
+        if called and type(result) == 'table' and result.ok and type(result.value) == 'table'
+            and result.value.matched == true then
+            return jobKey
+        end
+    end
+    return nil
 end
 
 -- Assigns (roleWanted = true) or clears the bank admin role for a connected player.

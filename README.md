@@ -2,7 +2,7 @@
 
 Modern, feature-rich banking for RedM on Feather Framework. BCC Banks adds multi‑account banking, transfers, safety deposit boxes integrated with feather-inventory, a gold exchange, a full loans system with admin approvals, a check/cheque system, and immersive world integration (NPC tellers, door locks, distance blips, prompts).
 
-Works out of the box: tables are auto-created on first run, UI is powered by feather-menu-v2, and all actions are server-validated to prevent client-side cheating.
+Version 2.0.0 is the Feather port. Money lives only in **feather-economy** (bank accounts, branch reserves), branches are **feather-organizations** businesses, bank staff are **feather-authority** roles, and bankers can be a **feather-jobs** job. Tables are auto-created on first run, the UI is powered by feather-menu-v2, and all actions are server-validated. Port details, trust entries and console tools: [FEATHER_PORT.md](FEATHER_PORT.md).
 
 ## Features
 
@@ -21,14 +21,18 @@ Works out of the box: tables are auto-created on first run, UI is powered by fea
 
 Ensure these resources are installed and started before `bcc-banks`:
 
+- feather-mysql
 - feather-core
 - feather-toolkit
 - feather-notify
 - feather-character
-- feather-roles
+- feather-economy
+- feather-authority
+- feather-organizations
 - feather-inventory
 - feather-menu-v2
-- oxmysql
+- feather-chat
+- Optional: feather-jobs (bank administration by job, `Config.Admin.jobs`)
 - Optional: weathersync (used to track in‑game days for loan due/default logic)
 - Optional: bcc-mailbox or a custom mail resource (for loan notifications)
 
@@ -41,14 +45,19 @@ These Feather resources are declared by `fxmanifest.lua` and must start before `
 2) Add start order to your `server.cfg` (example):
 
 ```
-ensure oxmysql
+ensure feather-mysql
 ensure feather-core
 ensure feather-toolkit
 ensure feather-notify
 ensure feather-character
-ensure feather-roles
+ensure feather-economy
+ensure feather-organizations
+ensure feather-authority
+ensure feather-jobs
 ensure feather-inventory
 ensure feather-menu-v2
+ensure feather-chat
+ensure feather-admin
 ensure bcc-minigames
 ensure bcc-banks
 ```
@@ -56,7 +65,11 @@ If you want to use this lockpick instead of bcc-minigames
 
 Requires the lockpick system dependency: https://github.com/guf1ck/lockpick-system
 
-3) Start the server. All required tables are created automatically (see "Database" below). Use `/bankadmin` to create your first bank at your position, or insert banks via SQL.
+3) Add the trust entries and the service-policy grant listed in [FEATHER_PORT.md](FEATHER_PORT.md) to feather-economy, feather-organizations, feather-authority, feather-jobs and feather-admin.
+
+4) Start the server. All required tables are created automatically (see "Database" below). Use `/bankadmin` to create your first bank at your position, or insert banks via SQL. Each branch starts with an empty reserve: fund it with `BccBanksReserveFund` before it can pay out loans, checks or gold.
+
+5) Run `BanksReleaseSmokeTest` in the server console and expect every line to PASS.
 
 ## Configuration
 
@@ -77,7 +90,14 @@ Main settings live in `BCC/bcc-banks/shared/config.lua`:
 - Safety Deposit Boxes: global max per player/bank and per‑size prices, weight, item blacklist and stack behavior.
 - Doors: map door hashes to initial lock state per bank.
 
-Tip: Bank administration resolves the active character through `feather-roles`. By default, only the `admin` and `owner` role keys in `Config.Admin.roles` are accepted; unavailable or unresolved role authority is denied.
+Bank administrators (`Config.Admin`) are, in this order:
+
+- the server console (`allowConsole`);
+- Feather Admin administrators and owners (characters holding a capability in `staffCapabilities`, default `staff.admin.audit.search`);
+- characters given the bank role with `BccBanksAdminGrant <server id>` (capability `staff.banks.manage`);
+- characters holding a feather-jobs job in `jobs` (default `banker`), on duty when `jobRequireOnDuty` is true. The job must be registered by its owner, for example as a bcc-society job type.
+
+Anything unavailable or unresolved is denied.
 
 ## Usage
 
@@ -95,6 +115,16 @@ Tip: Bank administration resolves the active character through `feather-roles`. 
 - `/bankadmin` — open the bank admin UI (requires admin per config).
 - Prompt key: `Config.PromptSettings.TellerKey` (default G) at teller.
 - A developer-only `banksReady` command exists to reinit banks in dev mode.
+
+Server console:
+
+| Command | Purpose |
+|---|---|
+| `BanksReleaseSmokeTest` | Read-only release check (configuration, Economy, Authority, Jobs, branch links, reserves, account links) |
+| `BccBanksAdminGrant <id>` / `BccBanksAdminRevoke <id>` | Give or remove the bank administrator role |
+| `BccBanksReserveStatus` | List branches, organizations and reserve balances |
+| `BccBanksReserveFund <bank id> <dollars\|gold> <amount>` | Create funds in a branch reserve |
+| `BccBanksEconomyMigrationReport` / `BccBanksEconomyMigrate confirm` | One-time import from the retired temporary economy (only for servers that ran it) |
 
 ## Database
 
@@ -115,8 +145,9 @@ You can seed banks by using `/bankadmin` → Create Bank At Your Location, or in
 - Loan timing: if `weathersync` is present, the script tracks game days to progress loan due dates and mark defaults.
 - Checks: written checks deduct from the account immediately. In item mode, the check item stores the `check_id` in metadata; the server validates the recipient and item ownership before paying out.
 - Mail: loan mail uses a unified dispatcher that routes to `bcc-mailbox` or the configured custom server event.
+- Money: bcc-banks keeps no balances. Every bank account is one feather-economy `bank` account per currency; deposits, withdrawals, transfers and fees are single Economy transfers, and loans, checks, boxes and gold exchange settle against the branch reserve.
 - Economy mutations write to the local durable Audit outbox. General bank event schemas remain queued for the shared `feather-audit` producer contract; this resource does not call webhooks directly.
 
 ## Credits
 
-Author: BCC Scripts
+Author: BCC Scripts ([BryceCanyonCounty](https://github.com/BryceCanyonCounty/bcc-banks)). Feather port by [BCC-FeatherFramework](https://github.com/BCC-FeatherFramework/bcc-banks). Licensed GPL-3.0.
