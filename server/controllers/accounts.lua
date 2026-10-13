@@ -293,8 +293,8 @@ end
 
 -- Moves money between a bank account and a branch reserve (loan disbursement and
 -- repayment, checks, rollbacks). The reserve is the account's own branch unless
--- `reserveBankId` names another one. `reason` is one of the bank.* reserve codes
--- Economy accepts; wallet <-> account movements use DepositFromWallet / WithdrawToWallet.
+-- `reserveBankId` names another one. `reason` is one of the reserve codes bcc-banks registers
+-- with Economy; wallet <-> account movements use DepositFromWallet / WithdrawToWallet.
 local function reserveTransfer(account, currency, amount, reason, reserveBankId, toAccount)
     amount = tonumber(amount)
     if not account or not IsFinitePositiveNumber(amount) then return false end

@@ -10,6 +10,30 @@ BanksEconomy = {}
 local RESOURCE = 'feather-economy'
 local CONTRACT = 1
 
+-- bcc-banks' reason codes and the Economy movement shapes each may use
+-- (feather-economy README "Operated accounts"). Registered on every start.
+-- "Reserve" is the branch organization's treasury, bound with EnsureOperatedTreasury.
+local IN_TO_RESERVE = { 'actor_wallet_to_operated', 'bank_to_operated' }
+local OUT_OF_RESERVE = { 'operated_to_wallet', 'operated_to_bank' }
+local REASONS = {
+    ['bank.deposit'] = 'actor_wallet_to_bank',  -- own wallet into a bank account
+    ['bank.withdraw'] = 'bank_to_actor_wallet', -- bank account into own wallet
+    ['bank.transfer'] = 'bank_to_bank',
+    ['bank.fee'] = 'bank_to_sink',
+    ['bank.loan.repayment'] = IN_TO_RESERVE,
+    ['bank.check.issue'] = IN_TO_RESERVE,
+    ['bank.box.fee'] = IN_TO_RESERVE,
+    ['bank.loan.disbursement'] = OUT_OF_RESERVE,
+    ['bank.check.cash'] = OUT_OF_RESERVE,
+    ['bank.box.refund'] = OUT_OF_RESERVE,
+    ['bank.compensation'] = OUT_OF_RESERVE,
+    ['bank.gold.exchange'] = { 'actor_wallet_to_operated', 'bank_to_operated', 'operated_to_wallet', 'operated_to_bank' },
+    -- Supply: creates currency only while Economy Config.OperatorSupply lists the
+    -- code for bcc-banks and a Core policy grant exists.
+    ['bank.migration.import'] = 'issue_to_bank',
+    ['bank.reserve.funding'] = 'issue_to_operated'
+}
+
 local function ok(value, meta)
     return { ok = true, value = value, meta = meta }
 end
@@ -95,10 +119,26 @@ local function without(request, ...)
     return copy
 end
 
-function BanksEconomy.Initialize()
-    -- Nothing to create locally. Readiness is checked per call.
-    return ok(true)
+function BanksEconomy.RegisterReasons()
+    local result = invoke('RegisterOperatedReasons', { reasons = REASONS })
+    if not result.ok then
+        print(('[bcc-banks] Economy reason registration failed: %s %s'):format(tostring(result.code),
+            tostring(result.message)))
+    end
+    return result
 end
+
+function BanksEconomy.Initialize()
+    -- Nothing to create locally; readiness is checked per call. Economy only
+    -- accepts bcc-banks movements under the reason codes registered here.
+    local awaited = BanksEconomy.AwaitReady(30000)
+    if not awaited.ok then return awaited end
+    return BanksEconomy.RegisterReasons()
+end
+
+AddEventHandler('onResourceStart', function(resource)
+    if resource == RESOURCE then CreateThread(BanksEconomy.RegisterReasons) end
+end)
 
 function BanksEconomy.GetHealth()
     local capabilities, failure = providerState()
@@ -180,11 +220,11 @@ function BanksEconomy.CreateAccount(request)
     return err('account_not_found', 'Economy did not return the requested bank account.')
 end
 
--- Binds a branch organization's treasuries as that branch's reserve and returns
--- them as a table keyed by currency: { dollars = account, gold = account }.
+-- Binds a branch organization's treasuries to bcc-banks as that branch's reserve
+-- and returns them as a table keyed by currency: { dollars = account, gold = account }.
 function BanksEconomy.EnsureBankReserve(request)
     request = type(request) == 'table' and request or {}
-    local result = invoke('EnsureBankReserve', { organizationId = request.organizationId }, contextFrom(request))
+    local result = invoke('EnsureOperatedTreasury', { organizationId = request.organizationId }, contextFrom(request))
     if not result.ok then return result end
     local byCurrency = {}
     for _, account in ipairs(result.value) do
@@ -205,15 +245,16 @@ function BanksEconomy.GetSystemAccount(request)
 end
 
 -- Moves funds between two Economy accounts. The reason code must be one of the
--- bank.* codes Economy accepts (bank.deposit, bank.withdraw, bank.transfer, bank.fee).
+-- REASONS above, in one of its shapes.
 function BanksEconomy.Transfer(request)
     request = type(request) == 'table' and request or {}
     return invoke('Transfer', without(request, 'actorCharacterId', 'actorAccountId', 'actorSource', 'correlationId'),
         contextFrom(request))
 end
 
--- Interim supply operations, restricted by Economy to allow-listed bank.* reason
--- codes. Prefer Transfer wherever a counterparty account exists.
+-- Supply operations, restricted by Economy to the supply REASONS listed for
+-- bcc-banks in its Config.OperatorSupply. Prefer Transfer wherever a counterparty
+-- account exists.
 function BanksEconomy.Issue(request)
     request = type(request) == 'table' and request or {}
     local body = without(request, 'toAccountId', 'actorCharacterId', 'actorAccountId', 'actorSource', 'correlationId')

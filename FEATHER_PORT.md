@@ -34,8 +34,11 @@ checks results.
 - Account-to-account transfers use `bank.transfer`; transfer fees move to the system
   sink as `bank.fee`.
 - Loans, checks, gold exchange and safety-deposit boxes settle against the branch reserve (see below).
-  `Config.BankSupply` of feather-economy now allows bcc-banks to create currency only for
+  `Config.OperatorSupply` of feather-economy allows bcc-banks to create currency only for
   `bank.migration.import` and operator `bank.reserve.funding`.
+- Economy does not know these codes in advance: bcc-banks registers each `bank.*` code and the
+  movement shapes it may use with `RegisterOperatedReasons` on every start (`REASONS` in
+  `server/feather/economy.lua`). Any other code, or a registered code in another shape, is refused.
 
 ## Bank administration (Authority)
 
@@ -69,8 +72,8 @@ Allowed, in order:
 
 Every row in `bcc_banks` is a Feather Organization (type `business`, key `bcc_bank_<id>`), linked through
 `bcc_banks.organization_id`. `server/feather/organizations.lua` creates, activates and links the organization on start
-(and for banks created in game), then calls Economy `EnsureBankReserve`, which permanently binds that organization's
-treasuries as a bcc-banks reserve.
+(and for banks created in game), then calls Economy `EnsureOperatedTreasury`, which permanently binds that organization's
+treasuries to bcc-banks as the branch reserve.
 
 Bank products move money between customers and their branch reserve with ordinary Economy transfers:
 
@@ -113,7 +116,7 @@ balance. Until it has run, accounts show no balance and money operations fail cl
 
 | Resource | Entries for `bcc-banks` |
 |---|---|
-| feather-economy `config.lua` | `trustedReaders`, `trustedProvisioners`, `trustedBankProvisioners`, `trustedBankTransactors`, `trustedTransactors`; `Config.BankSupply['bcc-banks']` |
+| feather-economy `config.lua` | `trustedReaders`, `trustedProvisioners`, `trustedBankProvisioners`, `trustedBankTransactors`, `trustedTreasuryOperators`, `trustedTransactors`; `Config.OperatorSupply['bcc-banks']` |
 | feather-organizations `config.lua` | `trustedCreators`, `trustedMutators`, `trustedReaders` |
 | feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` |
 | feather-jobs `config.lua` | `trustedReaders` (bank administration by job) |

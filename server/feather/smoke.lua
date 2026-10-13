@@ -1,6 +1,7 @@
 -- Read-only release check, server console only: BanksReleaseSmokeTest
 -- Verifies configuration, the Feather domains bcc-banks depends on, and that
--- every branch and customer account is linked. Moves no money and writes nothing.
+-- every branch and customer account is linked. Moves no money and writes nothing
+-- (it re-registers bcc-banks' reason codes with Economy, which changes nothing).
 
 local UUID = '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$'
 
@@ -12,6 +13,7 @@ RegisterCommand('BanksReleaseSmokeTest', function(source)
         local admin = (Config and Config.Admin) or {}
         local health = BanksEconomy.GetHealth()
         local sink = BanksEconomy.GetSystemAccount({ currency = 'dollars', accountType = 'system_sink' })
+        local reasons = BanksEconomy.RegisterReasons() -- idempotent: same codes, same shapes
         local role = exports['feather-authority']:FindRoleByKey({ roleKey = admin.role or 'staff.banks.admin' })
         local staffProbe = exports['feather-authority']:Evaluate({
             subjectType = 'character', subjectId = '00000000-0000-0000-0000-000000000000',
@@ -42,6 +44,7 @@ RegisterCommand('BanksReleaseSmokeTest', function(source)
             { 'development disabled', Config.devMode == false },
             { 'Economy ready', type(health) == 'table' and health.ok == true },
             { 'Economy trusts bcc-banks', type(sink) == 'table' and sink.ok == true },
+            { 'Economy accepts bank reasons', type(reasons) == 'table' and reasons.ok == true },
             { 'Authority bank role exists', type(role) == 'table' and role.ok == true },
             { 'Authority evaluation available', type(staffProbe) == 'table' and staffProbe.ok == true },
             { 'Jobs reachable (Admin.jobs)', jobsOk },

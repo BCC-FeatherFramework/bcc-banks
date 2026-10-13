@@ -59,7 +59,7 @@ function GetBankingContext(source)
         return tonumber(currencyId) == 1 and 'gold' or 'dollars'
     end
     -- Wallet payments settle against the reserve of branch `bankId`. `reason` is
-    -- one of the bank.* reserve codes Economy accepts (loan, check, box, gold).
+    -- one of the reserve codes bcc-banks registers with Economy (loan, check, box, gold).
     local function reserveTransfer(currencyId, amount, reason, bankId, toWallet)
         local currency = currencyName(currencyId)
         local reserveId, missing = BankOrganizations.GetReserveAccountId(bankId, currency)

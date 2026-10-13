@@ -2,7 +2,7 @@
 -- treasuries are the branch reserve: loans, checks, box fees and gold exchange
 -- move money between customers and that reserve instead of creating or
 -- destroying currency. Economy only lets bcc-banks use treasuries it bound with
--- EnsureBankReserve, so no other organization's treasury can be touched.
+-- EnsureOperatedTreasury, so no other organization's treasury can be touched.
 BankOrganizations = {}
 
 local REASON_CODE = 'banks.bootstrap'
