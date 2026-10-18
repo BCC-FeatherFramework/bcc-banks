@@ -84,6 +84,14 @@ local function isBankOpenNow(bank)
     return hour >= openHour or hour < closeHour
 end
 
+local function isNearBank(coords, bank, extraDistance, requireOpen)
+    local maxDistance = tonumber((Config.PromptSettings and Config.PromptSettings.Distance) or 3.0) or 3.0
+    maxDistance = maxDistance + (tonumber(extraDistance) or 2.0)
+    local bankCoords = vector3(tonumber(bank.x) or 0, tonumber(bank.y) or 0, tonumber(bank.z) or 0)
+    return #(vector3(coords.x, coords.y, coords.z) - bankCoords) <= maxDistance
+        and (requireOpen == false or isBankOpenNow(bank))
+end
+
 function IsPlayerNearBank(src, bankId, extraDistance, requireOpen)
     return GetNearbyBankId(src, bankId, extraDistance, requireOpen) ~= nil
 end
@@ -95,19 +103,22 @@ function GetNearbyBankId(src, bankId, extraDistance, requireOpen)
     local coords = GetEntityCoords(ped)
     if not coords then return nil end
 
-    local maxDistance = tonumber((Config.PromptSettings and Config.PromptSettings.Distance) or 3.0) or 3.0
-    maxDistance = maxDistance + (tonumber(extraDistance) or 2.0)
-
     for _, bank in ipairs(GetBanks() or {}) do
-        if not bankId or IdsEqual(bank.id, bankId) then
-            local bankCoords = vector3(tonumber(bank.x) or 0, tonumber(bank.y) or 0, tonumber(bank.z) or 0)
-            if #(vector3(coords.x, coords.y, coords.z) - bankCoords) <= maxDistance
-                and (requireOpen == false or isBankOpenNow(bank)) then
-                return bank.id
-            end
+        if (not bankId or IdsEqual(bank.id, bankId)) and isNearBank(coords, bank, extraDistance, requireOpen) then
+            return bank.id
         end
     end
     return nil
+end
+
+-- IsPlayerNearBank for a branch row the caller has already loaded.
+function IsPlayerNearBankRow(src, bank, extraDistance, requireOpen)
+    if type(bank) ~= 'table' then return false end
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return false end
+    local coords = GetEntityCoords(ped)
+    if not coords then return false end
+    return isNearBank(coords, bank, extraDistance, requireOpen)
 end
 
 if Config.devMode then

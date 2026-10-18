@@ -295,7 +295,7 @@ function OpenSDBInventory(sdb, ParentPage)
     FeatherBankMenu:Close()
     SetNuiFocus(false, false)
     devPrint('[SDB] Bank menu closed, focus released; waiting...')
-    Wait(250)
+    Wait(0) -- let the menu close before the inventory takes focus
     local sdbId = NormalizeId(sdb and sdb.id)
     devPrint('[SDB] Normalized sdb.id ->', tostring(sdbId))
     local ok = exports['feather-core']:CallRPCAsync('bcc-banks:OpenSDB', { sdb_id = sdbId })

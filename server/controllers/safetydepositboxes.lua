@@ -57,6 +57,7 @@ function GetUserSDBData(character, bank)
             'sdb.owner_id, ' ..
             'sdb.bank_id, ' ..
             'sdb.inventory_id, ' ..
+            'sdb.size, ' ..
             'acc.level ' ..
             'FROM bcc_safety_deposit_boxes AS sdb ' ..
             'INNER JOIN bcc_safety_deposit_boxes_access AS acc ' ..

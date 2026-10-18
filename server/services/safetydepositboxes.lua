@@ -3,22 +3,20 @@ local function getSDBBankId(sdbId)
     return row and row.bank_id or nil
 end
 
+-- Defined below; declared here so GetSDBs can pre-register the listed boxes.
+local ensureSDBInventoryRegistered
+
 exports['feather-core']:RegisterRPC('bcc-banks:GetSDBs', function(params, cb, src)
-    local user = GetBankingContext(src)
-    if not user then
-        devPrint('GetSDBs: no user for src', src)
+    -- Only the character id is needed: the in-memory Core session has it, while
+    -- the banking context also loads both wallets from Economy.
+    local session = exports['feather-core']:GetSessionContext(tonumber(src))
+    if type(session) ~= 'table' or session.ok ~= true or type(session.value) ~= 'table' then
+        devPrint('GetSDBs: no character session for src', src)
         NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_or_bank'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user
-    if not char then
-        devPrint('GetSDBs: no character for src', src)
-        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_character_or_bank'), 'error', 4000)
-        cb(false)
-        return
-    end
-    local characterId = char.characterId
+    local characterId = session.value.characterId
     local bankId = NormalizeId(params and params.bank)
 
     if not characterId or not bankId then
@@ -46,6 +44,15 @@ exports['feather-core']:RegisterRPC('bcc-banks:GetSDBs', function(params, cb, sr
     end
 
     cb(true, rows or {})
+
+    -- Register the listed boxes with Feather Inventory while the player is still
+    -- choosing, so the first Open Box does not pay for it.
+    CreateThread(function()
+        for _, box in ipairs(rows or {}) do
+            local registered, failure = pcall(ensureSDBInventoryRegistered, box.id, box.inventory_id, box.name, box.size)
+            if not registered then devPrint('GetSDBs: pre-registration failed for', box.id, failure) end
+        end
+    end)
 end)
 
 exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, src)
@@ -222,8 +229,25 @@ local function resolveSDBSizeConfig(sizeKey)
     return nil
 end
 
-local function ensureSDBInventoryRegistered(boxId, inventoryId, displayName, sizeKey)
+-- Boxes already registered with Feather Inventory during this run, keyed by box id.
+-- Registration is idempotent but costs about nine sequential queries, so each box
+-- registers once (again if its name or size differs) instead of on every open.
+local registeredSDBInventories = {}
+
+AddEventHandler('onResourceStart', function(resource)
+    if resource == 'feather-inventory' then registeredSDBInventories = {} end
+end)
+
+local function forgetSDBInventory(boxId)
+    registeredSDBInventories[tostring(boxId)] = nil
+end
+
+function ensureSDBInventoryRegistered(boxId, inventoryId, displayName, sizeKey)
     local invName = (displayName and displayName ~= '') and tostring(displayName) or 'Safety Deposit Box'
+    local cached = registeredSDBInventories[tostring(boxId)]
+    if cached and cached.invName == invName and cached.sizeKey == tostring(sizeKey) then
+        return cached.uuid, cached.id, cached.invName, cached.sizeCfg
+    end
     local sizeCfg = resolveSDBSizeConfig(sizeKey)
     local ignoreStacks = sizeCfg and sizeCfg.IgnoreItemLimit == true
     local blacklist = (sizeCfg and sizeCfg.BlacklistItems and #sizeCfg.BlacklistItems > 0) and sizeCfg.BlacklistItems or nil
@@ -246,6 +270,10 @@ local function ensureSDBInventoryRegistered(boxId, inventoryId, displayName, siz
         local failure = type(registered) == 'table' and registered.error or nil
         error(failure and (failure.message or failure.code) or 'Feather Inventory container registration failed')
     end
+    registeredSDBInventories[tostring(boxId)] = {
+        uuid = registered.value.uuid, id = registered.value.id,
+        invName = invName, sizeKey = tostring(sizeKey), sizeCfg = sizeCfg
+    }
     return registered.value.uuid, registered.value.id, invName, sizeCfg
 end
 
@@ -275,21 +303,16 @@ local function getSDBInventoryContentCounts(sdbId, inventoryId, displayName, siz
 end
 
 exports['feather-core']:RegisterRPC('bcc-banks:OpenSDB', function(params, cb, src)
-    local user = GetBankingContext(src)
-    if not user then
-        devPrint('OpenSDB: no user for src', src)
+    -- Opening a box needs only the character id. The in-memory Core session
+    -- has it; the banking context (wallets) and the profile each cost queries.
+    local session = exports['feather-core']:GetSessionContext(tonumber(src))
+    if type(session) ~= 'table' or session.ok ~= true or type(session.value) ~= 'table' then
+        devPrint('OpenSDB: no character session for src', src)
         NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
         cb(false)
         return
     end
-    local char = user
-    if not char then
-        devPrint('OpenSDB: no character for src', src)
-        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
-        cb(false)
-        return
-    end
-    local characterId = char.characterId
+    local characterId = session.value.characterId
     local sdbId = NormalizeId(params and params.sdb_id)
 
     if not characterId or not sdbId then
@@ -299,25 +322,30 @@ exports['feather-core']:RegisterRPC('bcc-banks:OpenSDB', function(params, cb, sr
         return
     end
 
-    if not HasSDBAccess(sdbId, characterId) then
+    -- Box, this character's access and the branch in one query: each separate
+    -- query waits for its own server tick.
+    local row = DB.query([[
+        SELECT s.`inventory_id`, s.`name`, s.`size`, s.`bank_id`,
+               a.`safety_deposit_box_id` AS `access_box_id`,
+               b.`id` AS `branch_id`, b.`x`, b.`y`, b.`z`,
+               b.`hours_active`, b.`open_hour`, b.`close_hour`
+        FROM `bcc_safety_deposit_boxes` s
+        LEFT JOIN `bcc_safety_deposit_boxes_access` a
+            ON a.`safety_deposit_box_id` = s.`id` AND a.`character_id` = ?
+        LEFT JOIN `bcc_banks` b ON b.`id` = s.`bank_id`
+        WHERE s.`id` = ? LIMIT 1;
+    ]], characterId, sdbId)[1]
+    if not row or row.access_box_id == nil then
         devPrint("OpenSDB: no access", "charId=", characterId, "sdbId=", sdbId)
         NotifyClient(src, Feather.Locale.translateUpper('error_insufficient_access'), 'error', 4000)
         cb(false)
         return
     end
-
-    -- Always query our table name directly
-    local row = DB.query(
-        'SELECT `inventory_id`,`name`,`size`,`bank_id` FROM `bcc_safety_deposit_boxes` WHERE `id`=? LIMIT 1;',
-        sdbId
-    )[1]
-    if not row then
-        devPrint("OpenSDB: SDB row not found for id", sdbId)
-        NotifyClient(src, Feather.Locale.translateUpper('error_sdb_not_found'), 'error', 4000)
-        cb(false)
-        return
-    end
-    if not IsPlayerNearBank(src, row.bank_id) then
+    local branch = row.branch_id and {
+        id = row.branch_id, x = row.x, y = row.y, z = row.z,
+        hours_active = row.hours_active, open_hour = row.open_hour, close_hour = row.close_hour
+    } or nil
+    if not IsPlayerNearBankRow(src, branch) then
         NotifyClient(src, Feather.Locale.translateUpper('error_not_at_bank'), 'error', 4000)
         cb(false)
         return
@@ -483,6 +511,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:DeleteSDB', function(params, cb, 
         NotifyClient(src, Feather.Locale.translateUpper('failed_delete_sdb'), 'error', 4000)
         return cb(false)
     end
+    forgetSDBInventory(sdbId)
 
     DB.exec('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', sdbId)
     local affected = DB.exec('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', sdbId)
