@@ -3,8 +3,8 @@
 Status: 3.0.0, Feather port on the Feather Economy ledger, with loans owed through
 feather-contracts and bank actions recorded in feather-audit. `BanksReleaseSmokeTest` is the
 read-only release check; `BanksAcceptanceTest` runs the live acceptance with nobody connected
-(48 passed, 0 failed on the development server, 18 October 2026). Still to check in game:
-restarting bcc-banks in the middle of a menu (live acceptance item 9). The one-time balance
+(48 passed, 0 failed on the development server, 18 October 2026), and the in-game restart in the
+middle of a menu passed the same day. The one-time balance
 migration is not needed on this server: no temporary-economy data exists.
 
 The player-facing menus, branches, NPCs, prompts, translations, checks, loans,
@@ -204,7 +204,7 @@ survived, empties and deletes the box and refunds it. A needs the cheapest box p
 | 6 | Check: write, cash by the recipient, void | PASS |
 | 7 | Box: buy, store, restart, item still there, delete | PASS |
 | 8 | Gold exchange both ways | PASS |
-| 9 | Restart bcc-banks in the middle of a menu: no duplicate teller, no money lost | in game, pending |
+| 9 | Restart bcc-banks in the middle of a menu: no duplicate teller, no money lost | PASS (in game: menu closed, account lock released, one teller, balances unchanged) |
 | 10 | Admin access by role; branch reserve by role; job holder reported | PASS (job holder needs a `banker` assignment) |
 | | Branch Reserve page; audit delivery and duplicate replay | PASS |
 
@@ -213,5 +213,5 @@ Offline specs (Lua 5.4, no server): `tests/loan_installments_spec.lua` (from the
 
 ## Remaining work
 
-1. Live acceptance item 9 in game.
+1. Before release: `devMode = false`, then `BanksReleaseSmokeTest` (item 1).
 2. Feather Menu v2 is checked up to `2.0.0-alpha.8` (alpha.5 to alpha.8 only added elements); recheck when it leaves alpha.
