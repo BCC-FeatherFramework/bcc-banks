@@ -73,11 +73,13 @@ local function cheapestBox(context)
     return best
 end
 
+-- A plain stackable item (not a weapon or ammunition) the box size accepts.
 local function storableItem(sizeKey)
     local blocked = {}
     local size = (Config.SafetyDepositBoxes.Sizes or {})[sizeKey] or {}
     for _, name in ipairs(size.BlacklistItems or {}) do blocked[name] = true end
-    for _, row in ipairs(DB.query('SELECT `name` FROM `items` ORDER BY `id` LIMIT 25') or {}) do
+    for _, row in ipairs(DB.query([[SELECT `name` FROM `items` WHERE `type` = 'item_item'
+        AND `instance_mode` = 'stack' AND `archived_at` IS NULL ORDER BY `id` LIMIT 25]]) or {}) do
         if not blocked[row.name] then return row.name end
     end
 end
@@ -261,24 +263,45 @@ local function run(characterA, characterB, bankArg)
         money(endB), money(dollarsB)))
 end
 
--- After a restart: the stored item is still in the box; then empty, delete, refund.
+-- After a restart: the stored item is still in the box; then empty it, delete it
+-- and refund the test price. Rerunnable: the refund is paid once, after deletion.
 local function runBox(characterA, boxId)
     local raw = GetResourceKvpString(BOX_KVP .. boxId)
-    local saved = raw and json.decode(raw)
-    if not check('7 box: test box recorded', type(saved) == 'table' and IdsEqual(saved.owner, characterA)) then return end
+    local saved = raw and json.decode(raw) or nil
     local row = DB.one('SELECT `id`,`name`,`size`,`inventory_id` FROM `bcc_safety_deposit_boxes` WHERE `id` = ?', boxId)
-    if not check('7 box: box still exists', row ~= nil) then return end
+    if not check('7 box: box exists and A owns it', row ~= nil and IsSDBOwner(boxId, characterA)) then return end
+    local inventoryId = tonumber(DB.value('SELECT `id` FROM `inventory` WHERE `uuid` = ?', row.inventory_id))
     local inventory = exports['feather-inventory'].initiate()
-    local count = inventory.Items.GetItemCount(saved.item, row.inventory_id)
-    local held = type(count) == 'table' and count.ok == true and tonumber(count.value) or 0
-    check('7 box: item survived the restart', held >= 1, saved.item .. ' x' .. held)
-    if held > 0 then inventory.Items.RemoveItemByName(saved.item, held, row.inventory_id) end
-    check('7 box: empty box deleted', IsSDBOwner(boxId, characterA) and DeleteEmptySDB(boxId, row).ok)
-    local refunded = pcall(function()
-        GetBankingContextForCharacter(characterA).CreditWallet(saved.payWith == 'gold' and 1 or 0, saved.price, 'bank.box.refund', saved.bank)
-    end)
-    check('7 box: test price refunded', refunded, (saved.payWith == 'gold' and '' or '$') .. money(saved.price) .. ' ' .. saved.payWith)
-    DeleteResourceKvp(BOX_KVP .. boxId)
+    local listed = inventoryId and inventory.Inventory.GetInventoryItems(inventoryId)
+    local items = type(listed) == 'table' and listed.ok == true and listed.value or {}
+    local names = {}
+    for _, item in pairs(items) do names[#names + 1] = tostring(item.name) end
+    if saved then
+        local survived = false
+        for _, name in ipairs(names) do survived = survived or name == saved.item end
+        check('7 box: item survived the restart', survived, table.concat(names, ', '))
+    end
+    local removedAll = true
+    for _, item in pairs(items) do
+        local removed = inventory.Items.RemoveItemById(item.id)
+        if type(removed) ~= 'table' or removed.ok ~= true then
+            removedAll = false
+            print(('%s   could not remove %s #%s: %s'):format(TAG, tostring(item.name), tostring(item.id),
+                tostring(type(removed) == 'table' and removed.error and removed.error.code or removed)))
+        end
+    end
+    check('7 box: emptied', removedAll, #names .. ' item(s)')
+    local deleted = DeleteEmptySDB(boxId, row)
+    if not check('7 box: empty box deleted', deleted.ok, deleted.reason) then return end
+    if saved then
+        local refunded = pcall(function()
+            GetBankingContextForCharacter(characterA).CreditWallet(saved.payWith == 'gold' and 1 or 0, saved.price, 'bank.box.refund', saved.bank)
+        end)
+        check('7 box: test price refunded', refunded, (saved.payWith == 'gold' and '' or '$') .. money(saved.price) .. ' ' .. saved.payWith)
+        DeleteResourceKvp(BOX_KVP .. boxId)
+    else
+        print(TAG .. ' 7 box: no refund recorded for this box (already refunded)')
+    end
 end
 
 RegisterCommand('BanksAcceptanceTest', function(source, args)
