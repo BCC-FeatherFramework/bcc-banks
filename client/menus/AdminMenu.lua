@@ -219,6 +219,12 @@ function OpenAdminBankHub(bank, Parent)
     }, function()
         OpenAdminHoursMenu(Hub, bank)
     end)
+    Hub:RegisterElement("button", {
+        label = Feather.Locale.translateUpper("admin_reserve_button"),
+        style = {}
+    }, function()
+        OpenAdminReserveMenu(Hub, bank)
+    end)
 
     Hub:RegisterElement("line", {
         slot  = "footer",
@@ -236,6 +242,68 @@ function OpenAdminBankHub(bank, Parent)
         style = {}
     })
     FeatherBankMenu:Open({ startupPage = Hub })
+end
+
+-- Branch reserve: balances, recent activity, and moving money between the
+-- reserve and the staff member's own wallet (server checks who may).
+function OpenAdminReserveMenu(Parent, bank)
+    local ok, status = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:GetReserve', { bank = bank.id })
+    if not ok or type(status) ~= 'table' then return end
+    local Page = FeatherBankMenu:RegisterPage('bank:page:admin:reserve:' .. tostring(bank.id))
+    Page:RegisterElement('header', { value = Feather.Locale.translateUpper('admin_reserve_header'), slot = 'header' })
+    Page:RegisterElement('subheader', { value = tostring(bank.name), slot = 'header' })
+    Page:RegisterElement('line', { slot = 'header', style = {} })
+
+    Page:RegisterElement('textdisplay', {
+        value = ('%s: $%.2f  |  %.2f %s'):format(Feather.Locale.translateUpper('admin_reserve_balance'),
+            tonumber(status.dollars) or 0, tonumber(status.gold) or 0, Feather.Locale.translateUpper('admin_reserve_gold')),
+        slot = 'content'
+    })
+    Page:RegisterElement('subheader', { value = Feather.Locale.translateUpper('admin_reserve_history'), slot = 'content' })
+    for _, entry in ipairs(status.entries or {}) do
+        local amount = tonumber(entry.amount) or 0
+        local text = entry.currency == 'gold' and ('%+.2f gold'):format(amount) or ('%s$%.2f'):format(amount < 0 and '-' or '+', math.abs(amount))
+        Page:RegisterElement('textdisplay', {
+            value = ('%s  %s  %s'):format(tostring(entry.postedAt or ''):sub(1, 16), text, tostring(entry.reason or '')),
+            slot = 'content'
+        })
+    end
+
+    local amountValue, noteValue, useGold = '', '', false
+    Page:RegisterElement('input', {
+        label = Feather.Locale.translateUpper('admin_reserve_amount_label'),
+        placeholder = '0.00', style = {}
+    }, function(data) amountValue = data.value end)
+    Page:RegisterElement('toggle', {
+        label = Feather.Locale.translateUpper('admin_reserve_gold'), start = false, slot = 'content'
+    }, function(data) useGold = data.value and true or false end)
+    Page:RegisterElement('input', {
+        label = Feather.Locale.translateUpper('admin_reserve_note_label'),
+        placeholder = Feather.Locale.translateUpper('admin_reserve_note_placeholder'), style = {}
+    }, function(data) noteValue = data.value end)
+
+    local function move(direction)
+        local amount = tonumber(amountValue)
+        if not amount or amount <= 0 then
+            Notify(Feather.Locale.translateUpper('error_invalid_input'), 'error', 3000)
+            return
+        end
+        local moved = exports['feather-core']:CallRPCAsync('bcc-banks:Admin:MoveReserve', {
+            bank = bank.id, currency = useGold and 'gold' or 'dollars', amount = amount,
+            direction = direction, note = noteValue
+        })
+        if moved then OpenAdminReserveMenu(Parent, bank) end
+    end
+    Page:RegisterElement('button', { label = Feather.Locale.translateUpper('admin_reserve_withdraw_button'), style = {} },
+        function() move('withdraw') end)
+    Page:RegisterElement('button', { label = Feather.Locale.translateUpper('admin_reserve_deposit_button'), style = {} },
+        function() move('deposit') end)
+
+    Page:RegisterElement('line', { slot = 'footer', style = {} })
+    Page:RegisterElement('button', { label = Feather.Locale.translateUpper('back_button'), slot = 'footer', style = {} },
+        function() Parent:RouteTo() end)
+    Page:RegisterElement('bottomline', { slot = 'footer', style = {} })
+    FeatherBankMenu:Open({ startupPage = Page })
 end
 
 function OpenAdminHoursMenu(Parent, bank)

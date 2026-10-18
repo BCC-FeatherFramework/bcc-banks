@@ -139,11 +139,16 @@ end
 -- Characters holding one of Config.Admin.jobs (feather-jobs job keys) also
 -- administer banks, as the original bcc-banks allowed for its banker job.
 -- Fails closed when feather-jobs is not running or does not know the job.
-function BankAuthority.MatchingJob(characterId)
+-- With `employerOrganizationId`, only an assignment employed by that organization
+-- (a branch) matches.
+function BankAuthority.MatchingJob(characterId, employerOrganizationId)
     local jobs = adminConfig().jobs
     if type(jobs) ~= 'table' or #jobs == 0 or GetResourceState('feather-jobs') ~= 'started' then return nil end
     for _, jobKey in ipairs(jobs) do
         local request = { characterId = characterId, jobKey = jobKey }
+        if employerOrganizationId then
+            request.employerType, request.employerId = 'organization', employerOrganizationId
+        end
         if adminConfig().jobRequireOnDuty then request.dutyState = 'on_duty' end
         local called, result = pcall(function() return exports['feather-jobs']:CheckAssignment(request) end)
         if called and type(result) == 'table' and result.ok and type(result.value) == 'table'
@@ -152,6 +157,18 @@ function BankAuthority.MatchingJob(characterId)
         end
     end
     return nil
+end
+
+-- A branch reserve: bank administrators (role or Admin staff) manage every branch;
+-- a banker job holder only the branch whose organization employs them.
+function BankAuthority.CanManageReserve(characterId, bankId)
+    local allowed, reason = BankAuthority.IsAllowedForCharacter(characterId)
+    if not allowed then return false, reason end
+    if type(reason) ~= 'string' or reason:sub(1, 4) ~= 'job:' then return true, reason end
+    local reserve = BankOrganizations.GetReserve(bankId)
+    local job = reserve and BankAuthority.MatchingJob(characterId, reserve.organizationId)
+    if job then return true, 'job:' .. job end
+    return false, 'not_branch_staff'
 end
 
 local UUID = '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$'

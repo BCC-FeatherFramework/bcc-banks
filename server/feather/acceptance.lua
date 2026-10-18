@@ -274,15 +274,33 @@ local function run(characterA, characterB, bankArg)
         skip('7 box', 'A cannot afford any box size (needs $100 or 1 gold)')
     end
 
+    -- Branch reserve management (/bankadmin): status, staff deposit and withdrawal.
+    local status = BankReserve.Status(bank.id, 5)
+    check('C reserve: balance and history readable', status.ok and status.dollars ~= nil and #status.entries > 0,
+        status.ok and ('$' .. money(status.dollars) .. ', ' .. #status.entries .. ' entries') or status.key)
+    local r0 = reserve(bank.id, 'dollars')
+    local _, w0 = wallet(characterA)
+    local put = BankReserve.Move(wallet(characterA), bank.id, 'dollars', 1, 'deposit')
+    local _, w1 = wallet(characterA)
+    check('C reserve: staff deposit from wallet', put.ok and near(w0 - w1, 1) and near(reserve(bank.id, 'dollars'), r0 + 1), put.key)
+    local took = BankReserve.Move(wallet(characterA), bank.id, 'dollars', 1, 'withdraw')
+    check('C reserve: staff withdrawal to wallet', took.ok and near(select(2, wallet(characterA)), w0)
+        and near(reserve(bank.id, 'dollars'), r0), took.key)
+    check('C reserve: cannot withdraw more than the reserve',
+        BankReserve.Move(wallet(characterA), bank.id, 'dollars', (r0 or 0) + 1000, 'withdraw').key == 'admin_reserve_short')
+
     -- 10. Bank administration by role (job holders are reported, not changed).
     local wasAllowed, wasReason = BankAuthority.IsAllowedForCharacter(characterB)
     if wasAllowed then
         skip('10 admin: role grant changes access', 'B is already allowed: ' .. tostring(wasReason))
     else
+        check('C reserve: B without a role cannot manage it', not BankAuthority.CanManageReserve(characterB, bank.id))
         local granted, grantDetail = BankAuthority.ReplaceAssignment(characterB, true)
         local allowed = granted and BankAuthority.IsAllowedForCharacter(characterB)
+        local manages = granted and BankAuthority.CanManageReserve(characterB, bank.id)
         local revoked = BankAuthority.ReplaceAssignment(characterB, false)
         check('10 admin: granted role allows B', granted and allowed, not granted and grantDetail or nil)
+        check('C reserve: the bank role manages any branch reserve', manages)
         check('10 admin: revoked role denies B again', revoked and not BankAuthority.IsAllowedForCharacter(characterB))
     end
     local job = BankAuthority.MatchingJob(characterB)

@@ -28,6 +28,9 @@ local REASONS = {
     ['bank.box.refund'] = OUT_OF_RESERVE,
     ['bank.compensation'] = OUT_OF_RESERVE,
     ['bank.gold.exchange'] = { 'actor_wallet_to_operated', 'bank_to_operated', 'operated_to_wallet', 'operated_to_bank' },
+    -- Branch staff moving money between the reserve and their own wallet (/bankadmin).
+    ['bank.reserve.deposit'] = 'actor_wallet_to_operated',
+    ['bank.reserve.withdraw'] = 'operated_to_wallet',
     -- Supply: creates currency only while Economy Config.OperatorSupply lists the
     -- code for bcc-banks and a Core policy grant exists.
     ['bank.migration.import'] = 'issue_to_bank',
