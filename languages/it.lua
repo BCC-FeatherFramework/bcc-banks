@@ -525,4 +525,8 @@ Feather.Locale.register("it", {
     error_loan_operation_busy = "Questo prestito è già in fase di aggiornamento. Riprova.",
     error_financial_operation_busy = "È già in corso un'altra operazione finanziaria. Riprova.",
     error_unable_withdraw = "Impossibile completare il prelievo.",
+    error_repay_below_installment = "La prossima rata è di $%s; inserisci almeno questo importo.",
+    loan_payment_pending = "Il pagamento è in fase di conferma. Ricontrolla il prestito tra poco.",
+    next_installment_label = "Prossima rata",
+    installments_paid_label = "Rate pagate",
 })

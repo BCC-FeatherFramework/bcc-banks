@@ -38,6 +38,8 @@ local function loadChat()
         GetCurrentResourceName=function() return 'feather-chat' end,
         GetInvokingResource=function() return 'bcc-banks' end,
         TriggerClientEvent=function() end,
+        -- feather-chat localizes its errors; the keys are enough here.
+        ChatLocale={ T=function(key) return key end, MessageKey=function() return nil end },
         AddEventHandler=function(name, cb) handler(chatEvents, name, cb) end,
         exports=setmetatable({ ['feather-core']=core }, {
             __call=function(_, name, fn) chatExports[name] = fn end

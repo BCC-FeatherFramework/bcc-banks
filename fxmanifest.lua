@@ -28,6 +28,7 @@ server_scripts {
    'server/feather/migration.lua',
    'server/feather/authority.lua',
    'server/feather/organizations.lua',
+   'server/feather/contracts.lua',
    'server/feather/smoke.lua',
    'server/feather/acceptance.lua',
    'languages/*.lua',

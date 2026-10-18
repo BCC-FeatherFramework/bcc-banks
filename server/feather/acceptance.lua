@@ -4,7 +4,7 @@
 --   BanksAcceptanceTest <character A> <character B> [bank id]
 --   BanksAcceptanceTest box <character A> <box id>      (after a server restart)
 --
--- A needs the cheapest box price plus about $50 in the wallet: the box is bought
+-- A needs the cheapest box price plus about $55 in the wallet: the box is bought
 -- and refunded by the second command. B gains $1.00 (a transfer and a cashed
 -- check); A pays that, a cross-branch fee and the spread on 0.15 gold bought and
 -- sold. Test accounts are closed again; 1.00 dollar of reserve funding stays.
@@ -216,6 +216,42 @@ local function run(characterA, characterB, bankArg)
         end
     else
         skip('6 checks', 'Config.Checks.Enabled is false')
+    end
+
+    -- 5. Loans: apply, approve (paid from the reserve), installments in feather-contracts, repay.
+    if BankLoanContracts.ready then
+        local reserve0 = reserve(bank.id, 'dollars') or 0
+        local interest = GetCharacterLoanInterest(characterA, bank.id)
+        local created = CreateLoan(accountA, characterA, 2, interest, 2, bank.id)
+        local loanId = created.status and created.loan and created.loan.id
+        if check('5 loans: apply for $2.00 over 2 months', loanId ~= nil, created.message) then
+            local _, before = account(accountA)
+            local approved = ApproveLoan(loanId, characterB)
+            local _, after = account(accountA)
+            check('5 loans: approval pays $2.00 from the reserve', approved.status and near(after - before, 2)
+                and near(reserve(bank.id, 'dollars'), reserve0 - 2), approved.message)
+            local rows = BankLoanContracts.Installments(loanId)
+            local owed = 0
+            for _, row in ipairs(rows) do owed = owed + (tonumber(row.amount) or 0) end
+            check('5 loans: two installments issued in Contracts', #rows == 2 and rows[1].obligation_id ~= nil
+                and near(owed, 2 * (1 + interest / 100)), ('$%s at %s%%'):format(money(owed), tostring(interest)))
+            check('5 loans: open loan keeps its account', CloseAccount(bank.id, accountA, characterA).status == false)
+            local low = BankLoanContracts.Pay(GetLoan(loanId), 0.01)
+            check('5 loans: less than an installment is refused', not low.ok and low.code == 'below_installment')
+            if rows[1] then
+                local _, w0 = wallet(characterA)
+                local first = BankLoanContracts.Pay(GetLoan(loanId), tonumber(rows[1].amount))
+                local _, w1 = wallet(characterA)
+                check('5 loans: first installment paid from the wallet', first.ok and first.paid == 1
+                    and near(w0 - w1, rows[1].amount), first.code)
+                local rest = BankLoanContracts.Pay(GetLoan(loanId), 100)
+                check('5 loans: last installment closes the loan', rest.ok and rest.paid == 1
+                    and GetLoan(loanId).status == 'paid', rest.code)
+                check('5 loans: reserve repaid with interest', near(reserve(bank.id, 'dollars'), reserve0 - 2 + owed))
+            end
+        end
+    else
+        skip('5 loans', 'feather-contracts loan type is not registered')
     end
 
     -- 7. Safety-deposit box: buy, store an item, refuse deletion while full.

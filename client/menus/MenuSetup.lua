@@ -725,6 +725,19 @@ function OpenLoansListPage(account, bank, ParentPage)
     FeatherBankMenu:Open({ startupPage = LoansListPage })
 end
 
+-- Installments paid and the next one due, for a loan details summary.
+function LoanInstallmentsHtml(info)
+    local installments = type(info) == 'table' and type(info.installments) == 'table' and info.installments or nil
+    if not installments then return '' end
+    local html = '<div style="padding:0 10px 10px;"><div><b>' .. Feather.Locale.translateUpper('installments_paid_label')
+        .. '</b> ' .. tostring(installments.paid) .. ' / ' .. tostring(installments.total) .. '</div>'
+    if installments.nextAmount then
+        html = html .. '<div><b>' .. Feather.Locale.translateUpper('next_installment_label') .. '</b> $'
+            .. ('%.2f'):format(installments.nextAmount) .. ' (' .. tostring(installments.nextDue) .. ')</div>'
+    end
+    return html .. '</div>'
+end
+
 function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
     local loanIdStr = NormalizeId(loanId)
     if not loanIdStr then
@@ -757,7 +770,7 @@ function OpenLoanDetailsPage(account, bank, loanId, ParentPage)
             <div><b>]] .. Feather.Locale.translateUpper('repaid_label') .. [[</b> $]] .. tostring(info.repaid) .. [[</div>
             <div><b>]] .. Feather.Locale.translateUpper('outstanding_label') .. [[</b> $]] .. tostring(info.outstanding) .. [[</div>
         </div>
-    ]]
+    ]] .. LoanInstallmentsHtml(info)
     LoanDetailsPage:RegisterElement('html', { value = { summaryHtml } })
 
     local loanData = info.loan or {}
@@ -883,7 +896,7 @@ function OpenLoanDetailsPage_NoAccount(bank, loanId, ParentPage)
             <div><b>]] .. Feather.Locale.translateUpper('repaid_label') .. [[</b> $]] .. tostring(info.repaid) .. [[</div>
             <div><b>]] .. Feather.Locale.translateUpper('outstanding_label') .. [[</b> $]] .. tostring(info.outstanding) .. [[</div>
         </div>
-    ]]
+    ]] .. LoanInstallmentsHtml(info)
     LoanDetailsNoAccountPage:RegisterElement('html', { value = { summaryHtml } })
 
     local loanData = info.loan or {}

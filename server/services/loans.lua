@@ -50,12 +50,10 @@ local function getSourceForCharacter(characterId)
     if not characterId then return nil end
     for _, playerId in ipairs(GetPlayers()) do
         local src = tonumber(playerId)
-        local user = GetBankingContext(src)
-        if user then
-            local character = user
-            if character and IdsEqual(character.characterId, characterId) then
-                return src
-            end
+        local session = exports['feather-core']:GetSessionContext(src)
+        if type(session) == 'table' and session.ok and type(session.value) == 'table'
+            and IdsEqual(session.value.characterId, characterId) then
+            return src
         end
     end
     return nil
@@ -72,33 +70,35 @@ local function canViewLoan(src, loan)
     return loan.account_id and (HasAccountAccess(loan.account_id, characterId) or IsAccountOwner(loan.account_id, characterId)) or false
 end
 
-local function sendDailyReminder(loanRow, info, elapsedDays, dueDays)
+-- Called by server/feather/contracts.lua when an installment falls due (a
+-- reminder) or defaults (the borrower's accounts are frozen by then).
+function BccBanksInternal.loanInstallmentNotice(loanRow, installment, status)
     local _, reminders = getReminderConfig()
     if reminders.Enabled ~= true then return end
-
+    local info = ComputeLoanOutstanding(loanRow.id)
     local outstanding = tonumber(info and info.outstanding or 0) or 0
     if outstanding <= 0 then return end
-
-    local totalDays = (dueDays and dueDays > 0) and dueDays or elapsedDays
-    local subjectFmt = reminders.MailSubject or 'Loan Payment Reminder'
-    local bodyFmt = reminders.MailBody or 'Day %d of %d for your loan #%s. Outstanding balance: $%s. Please visit the bank to avoid default.'
-    local notifyMsg = reminders.NotifyMessage or 'Your bank loan is still outstanding. Visit a bank today to make a payment.'
+    local summary = info and info.installments or {}
     local fromName = reminders.MailFrom or 'Bank Postmaster'
-
-    local formattedSubject = safeFormat(subjectFmt, elapsedDays, totalDays, loanRow.id, formatCurrency(outstanding))
-    local formattedBody = safeFormat(bodyFmt, elapsedDays, totalDays, loanRow.id, formatCurrency(outstanding))
-
-    if reminders.SendMailbox then
-        if BccBanksInternal and BccBanksInternal.sendMailToCharacter then
-            BccBanksInternal.sendMailToCharacter(loanRow.character_id, fromName, formattedSubject, formattedBody)
-        end
+    local subject, body, notice
+    if status == 'defaulted' then
+        subject = 'Loan Default Notice'
+        body = ('Installment %d of your loan #%s is overdue. $%s remains outstanding and your accounts are frozen until it is paid.')
+            :format(tonumber(installment.seq) or 0, loanRow.id, formatCurrency(outstanding))
+        notice = reminders.NotifyMessage or 'Your bank loan is still outstanding. Visit a bank today to make a payment.'
+    else
+        local subjectFmt = reminders.MailSubject or 'Loan Payment Reminder'
+        local bodyFmt = reminders.MailBody or 'Installment %d of %d for your loan #%s is due. Outstanding balance: $%s. Please visit the bank to avoid default.'
+        subject = safeFormat(subjectFmt, tonumber(installment.seq) or 0, summary.total or 0, loanRow.id, formatCurrency(outstanding))
+        body = safeFormat(bodyFmt, tonumber(installment.seq) or 0, summary.total or 0, loanRow.id, formatCurrency(outstanding))
+        notice = reminders.NotifyMessage or 'Your bank loan is still outstanding. Visit a bank today to make a payment.'
     end
-
+    if reminders.SendMailbox and BccBanksInternal.sendMailToCharacter then
+        BccBanksInternal.sendMailToCharacter(loanRow.character_id, fromName, subject, body)
+    end
     if reminders.NotifyOnline then
         local src = getSourceForCharacter(loanRow.character_id)
-        if src then
-            NotifyClient(src, notifyMsg, 'warning', 6000)
-        end
+        if src then NotifyClient(src, notice, 'warning', 6000) end
     end
 end
 
@@ -404,58 +404,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:GetLoanRate', function(params, cb
     cb(true, rate)
 end)
 
--- Background: track in-game days passed and enforce defaults -> freeze accounts
-CreateThread(function()
-    while not BccBanksDatabaseReady do
-        Wait(250)
-    end
-
-    while true do
-        Wait(60000) -- check roughly once per real minute
-        local curDay = 0
-        if exports and exports.weathersync and exports.weathersync.getTime then
-            local t = exports.weathersync:getTime() or {}
-            curDay = tonumber(t.day) or 0
-        end
-
-        -- Fetch approved, non-defaulted loans
-        local loans = DB.query('SELECT id, character_id, last_game_day, game_days_elapsed, due_game_days, status FROM `bcc_loans` WHERE `status` = "approved" AND `is_defaulted` = 0') or {}
-        for _, ln in ipairs(loans) do
-            local last = tonumber(ln.last_game_day or curDay)
-            local elapsed = tonumber(ln.game_days_elapsed or 0)
-            local due = tonumber(ln.due_game_days or 0)
-            if last ~= curDay then
-                local delta = (curDay - last) % 7
-                local newElapsed = elapsed + delta
-                DB.exec('UPDATE `bcc_loans` SET `game_days_elapsed` = ?, `last_game_day` = ? WHERE `id` = ?', newElapsed, curDay, ln.id)
-
-                local info = ComputeLoanOutstanding(ln.id)
-                if info then
-                    if delta > 0 then
-                        sendDailyReminder(ln, info, newElapsed, due)
-                    end
-
-                    local outstanding = tonumber(info.outstanding or 0) or 0
-                    if due and due > 0 and newElapsed >= due and outstanding > 0 then
-                        if BccBanksInternal and BccBanksInternal.sendMailToCharacter then
-                            local _, reminders = getReminderConfig()
-                            local fromName = reminders.MailFrom or 'Bank Postmaster'
-                            local subject = 'Loan Default Notice'
-                            local body = ('Your loan #%s is overdue with $%s outstanding. Visit any bank immediately to settle the debt or expect enforcement actions.'):format(
-                                ln.id,
-                                formatCurrency(outstanding)
-                            )
-                            BccBanksInternal.sendMailToCharacter(ln.character_id, fromName, subject, body)
-                        end
-                        -- Mark defaulted and freeze all accounts for owner
-                        DB.exec('UPDATE `bcc_loans` SET `is_defaulted` = 1, `status` = "defaulted" WHERE `id` = ?', ln.id)
-                        SetOwnerAccountsFrozen(ln.character_id, true)
-                    end
-                end
-            end
-        end
-    end
-end)
+-- Due dates, defaults and account freezes come from feather-contracts
+-- (server/feather/contracts.lua); there is no in-game day counter any more.
 
 exports['feather-core']:RegisterRPC('bcc-banks:RepayLoan', function(params, cb, src)
     devPrint('RepayLoan RPC called. src=', src, 'params=', params)
@@ -531,66 +481,25 @@ exports['feather-core']:RegisterRPC('bcc-banks:RepayLoan', function(params, cb, 
         return
     end
 
-    -- Check current outstanding and prevent over/extra payments
-    local info = ComputeLoanOutstanding(loan_id)
-    if info and info.outstanding then
-        if info.outstanding <= 0 then
-            NotifyClient(src, Feather.Locale.translateUpper('error_loan_already_paid') or 'Loan already fully repaid.', 'success', 4000)
-            ReleasePlayerFinancialLock(src)
-            ActiveLoanRepayments[loan_id] = nil
-            cb(false)
-            return
+    -- Whole installments, oldest first, paid from the wallet through feather-contracts.
+    local paid = BankLoanContracts.Pay(loanRow, amount, { actorSource = src })
+    if not paid.ok then
+        ReleasePlayerFinancialLock(src)
+        ActiveLoanRepayments[loan_id] = nil
+        if paid.code == 'below_installment' then
+            NotifyClient(src, Feather.Locale.translateUpper('error_repay_below_installment', ('%.2f'):format(paid.next or 0)), 'error', 4000)
+        elseif paid.code == 'insufficient_funds' then
+            NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash', tostring(char.money or 0)), 'error', 4000)
+        elseif paid.code == 'settlement_pending' then
+            NotifyClient(src, Feather.Locale.translateUpper('loan_payment_pending'), 'warning', 5000)
+        else
+            NotifyClient(src, Feather.Locale.translateUpper('error_unable_repay_loan'), 'error', 4000)
         end
-        if amount > info.outstanding then
-            amount = info.outstanding
-        end
-    end
-
-    if not amount or amount <= 0 then
-        NotifyClient(src, Feather.Locale.translateUpper('invalid_repay_amount') or 'Enter a valid repayment amount.', 'error', 4000)
-        ReleasePlayerFinancialLock(src)
-        ActiveLoanRepayments[loan_id] = nil
         cb(false)
         return
     end
-
-    -- Check player has enough cash and remove it
-    local currentDollars = tonumber(char.money) or 0
-    if currentDollars < amount then
-        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash', tostring(currentDollars)) or 'Not enough cash.', 'error', 4000)
-        ReleasePlayerFinancialLock(src)
-        ActiveLoanRepayments[loan_id] = nil
-        cb(false)
-        return
-    end
-    local removed = pcall(function() char.DebitWallet(0, amount, 'bank.loan.repayment',
-        loanRow.bank_id or GetNearbyBankId(src)) end)
-    if not removed then
-        ReleasePlayerFinancialLock(src)
-        ActiveLoanRepayments[loan_id] = nil
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_repay_loan'), 'error', 4000)
-        cb(false)
-        return
-    end
-
-    -- Record the repayment against the loan
-    local repayDesc = _U and Feather.Locale.translateUpper('loan_repayment_cash_desc') or 'Loan repayment from character cash'
-    AddLoanTransaction(loan_id, characterId, amount, 'loan - repayment', repayDesc)
-
-    -- If fully repaid now, mark loan as paid
+    amount = paid.amount
     local after = ComputeLoanOutstanding(loan_id)
-    if after and (after.outstanding or 0) <= 0 then
-        DB.exec('UPDATE `bcc_loans` SET `status` = "paid", `is_defaulted` = 0 WHERE `id` = ?', loan_id)
-        if loanRow and loanRow.character_id then
-            local remainingDefaults = DB.value(
-                'SELECT COUNT(*) FROM `bcc_loans` WHERE `character_id` = ? AND (`status` = "defaulted" OR `is_defaulted` = 1)',
-                loanRow.character_id
-            )
-            if (tonumber(remainingDefaults) or 0) == 0 then
-                SetOwnerAccountsFrozen(loanRow.character_id, false)
-            end
-        end
-    end
 
     NotifyClient(src, Feather.Locale.translateUpper('success_loan_repaid'), 'success', 4000)
     local remaining = after and after.outstanding or nil

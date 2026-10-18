@@ -525,4 +525,8 @@ Feather.Locale.register("ro", {
     error_loan_operation_busy = "Acest împrumut este deja actualizat. Încearcă din nou.",
     error_financial_operation_busy = "O altă operațiune financiară este în curs. Încearcă din nou.",
     error_unable_withdraw = "Retragerea nu a putut fi finalizată.",
+    error_repay_below_installment = "Următoarea rată este $%s; introdu cel puțin această sumă.",
+    loan_payment_pending = "Plata ta este în curs de confirmare. Verifică împrumutul din nou în scurt timp.",
+    next_installment_label = "Următoarea rată",
+    installments_paid_label = "Rate plătite",
 })

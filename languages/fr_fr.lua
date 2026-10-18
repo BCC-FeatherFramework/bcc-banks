@@ -525,4 +525,8 @@ Feather.Locale.register("fr_fr", {
     error_loan_operation_busy = "Ce prêt est déjà en cours de mise à jour. Veuillez réessayer.",
     error_financial_operation_busy = "Une autre opération financière est en cours. Veuillez réessayer.",
     error_unable_withdraw = "Impossible de terminer le retrait.",
+    error_repay_below_installment = "La prochaine échéance est de $%s ; saisissez au moins ce montant.",
+    loan_payment_pending = "Votre paiement est en cours de confirmation. Revérifiez le prêt dans un instant.",
+    next_installment_label = "Prochaine échéance",
+    installments_paid_label = "Échéances payées",
 })

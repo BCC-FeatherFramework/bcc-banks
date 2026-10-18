@@ -525,4 +525,8 @@ Feather.Locale.register("de", {
     error_loan_operation_busy = "Dieses Darlehen wird bereits aktualisiert. Bitte versuchen Sie es erneut.",
     error_financial_operation_busy = "Ein anderer Finanzvorgang läuft bereits. Bitte versuchen Sie es erneut.",
     error_unable_withdraw = "Die Auszahlung konnte nicht abgeschlossen werden.",
+    error_repay_below_installment = "Die nächste Rate beträgt $%s; gib mindestens diesen Betrag ein.",
+    loan_payment_pending = "Deine Zahlung wird bestätigt. Prüfe den Kredit gleich noch einmal.",
+    next_installment_label = "Nächste Rate",
+    installments_paid_label = "Bezahlte Raten",
 })

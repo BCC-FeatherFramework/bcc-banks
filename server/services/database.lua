@@ -170,6 +170,16 @@ CreateThread(function()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     ]])
 
+    -- Installments of a loan: one feather-contracts obligation each (server/feather/contracts.lua).
+    ensureColumn('bcc_loans_payments', 'seq', 'INT UNSIGNED NOT NULL DEFAULT 0')
+    ensureColumn('bcc_loans_payments', 'obligation_id', 'CHAR(36) NULL')
+    ensureColumn('bcc_loans_payments', 'status', "VARCHAR(20) NOT NULL DEFAULT 'open'")
+    ensureColumn('bcc_loans_payments', 'paid_at', 'DATETIME NULL')
+    if not DB.value([[SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE()
+        AND table_name = 'bcc_loans_payments' AND index_name = 'uq_lp_loan_seq' LIMIT 1]]) then
+        DB.exec('ALTER TABLE `bcc_loans_payments` ADD UNIQUE KEY `uq_lp_loan_seq` (`loan_id`, `seq`)')
+    end
+
     -- bcc_loan_interest_rates (no FKs)
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_loan_interest_rates` (

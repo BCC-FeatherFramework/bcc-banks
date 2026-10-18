@@ -129,15 +129,24 @@ Config = {
 	},
 
 	-- Loan timing & reminders
+	-- Loans are repaid in installments, one feather-contracts obligation each: a loan
+	-- of N months owes amount + interest in N equal installments, one due every
+	-- SecondsPerMonth real seconds after approval. An installment still unpaid
+	-- DefaultAfterSeconds after its due date defaults and freezes the borrower's accounts.
+	LoanContracts = {
+		SecondsPerMonth     = 86400, -- one loan month in real seconds (86400 = 1 real day)
+		DefaultAfterSeconds = 86400, -- grace after an installment's due date before it defaults
+	},
+
 	LoanTiming = {
-		DaysUntilDefault = 10, -- Number of in-game days (weathersync cycles) before a loan defaults
+		-- Messages sent when an installment falls due (reminder) and when it defaults.
 		DailyReminders = {
 			Enabled = true,            -- Send daily reminders while a balance remains
 			SendMailbox = true,        -- Deliver a mail via mail system
 			NotifyOnline = true,       -- Pop an on-screen notification for borrowers that are online
 			MailFrom = 'Bank Postmaster', -- Display name for system mail
-			MailSubject = 'Loan Payment Reminder', -- string.format with (elapsedDays, dueDays, loanId, outstanding)
-			MailBody = 'Day %d of %d for your loan #%s. Outstanding balance: $%s. Please visit the bank to avoid default.',
+			MailSubject = 'Loan Payment Reminder', -- string.format with (installment, installments, loanId, outstanding)
+			MailBody = 'Installment %d of %d for your loan #%s is due. Outstanding balance: $%s. Please visit the bank to avoid default.',
 			NotifyMessage = 'Your bank loan is still outstanding. Visit a bank today to make a payment.'
 		}
 	},
@@ -165,7 +174,7 @@ Config = {
 				MaxWeight       = 100,
 				IgnoreItemLimit = true, -- Ignore max quantity of items
 				BlacklistItems  = { -- List of item names from the Database (case sensitive)
-					'apple'
+					'consumable_apple'
 				}
 			},
 			Medium = {

@@ -525,4 +525,8 @@ Feather.Locale.register("pl", {
     error_loan_operation_busy = "Ta pożyczka jest już aktualizowana. Spróbuj ponownie.",
     error_financial_operation_busy = "Trwa już inna operacja finansowa. Spróbuj ponownie.",
     error_unable_withdraw = "Nie udało się ukończyć wypłaty.",
+    error_repay_below_installment = "Następna rata wynosi $%s; wpisz co najmniej tę kwotę.",
+    loan_payment_pending = "Twoja płatność jest potwierdzana. Sprawdź pożyczkę ponownie za chwilę.",
+    next_installment_label = "Następna rata",
+    installments_paid_label = "Spłacone raty",
 })

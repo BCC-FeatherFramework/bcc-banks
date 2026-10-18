@@ -201,6 +201,13 @@ function CloseAccount(bank, account, character)
         return { status = false, message = "Insufficient Access." }
     end
 
+    -- Deleting the account cascades to its loans; an open loan keeps the account.
+    local openLoans = DB.value([[SELECT COUNT(*) FROM `bcc_loans` WHERE `account_id` = ?
+        AND `status` IN ('pending', 'approved', 'defaulted')]], account)
+    if (tonumber(openLoans) or 0) > 0 then
+        return { status = false, message = "Unable to close. The account has an open loan." }
+    end
+
     DB.exec('DELETE FROM `bcc_accounts` WHERE `id` = ?', account)
     return { status = true, accounts = GetAccounts(character, bank) }
 end

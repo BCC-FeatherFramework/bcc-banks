@@ -63,7 +63,9 @@ function ComputeLoanOutstanding(loan_id)
     local baseAmount = tonumber(loan.amount) or 0
     local interestPercent = tonumber(loan.interest) or 0
     local totalDue = roundCurrency(baseAmount * (1 + (interestPercent / 100)))
-    local repaid = roundCurrency(SumLoanRepayments(loan_id))
+    -- Once approved, the loan is owed as Contracts installments (server/feather/contracts.lua).
+    local installments = BankLoanContracts and BankLoanContracts.Summary(loan_id) or nil
+    local repaid = roundCurrency(installments and installments.paidAmount or SumLoanRepayments(loan_id))
     local outstanding = totalDue - repaid
     if math.abs(outstanding) < 0.005 then outstanding = 0 end
     if outstanding < 0 then outstanding = 0 end
@@ -72,49 +74,32 @@ function ComputeLoanOutstanding(loan_id)
         total_due = totalDue,
         repaid = repaid,
         outstanding = outstanding,
+        installments = installments,
         loan = loan
     }
 end
 
-function RepayLoan(loan_id, account_id, character_id, amount)
-    if not loan_id or not account_id or not character_id or not amount or amount <= 0 then
-        return { status = false, message = 'Invalid repayment data.' }
-    end
+local function loanTotalDue(loan)
+    local baseAmount = tonumber(loan.amount) or 0
+    return roundCurrency(baseAmount * (1 + ((tonumber(loan.interest) or 0) / 100)))
+end
 
-    -- Prevent additional payments if already fully repaid
-    local info = ComputeLoanOutstanding(loan_id)
-    if info and (info.outstanding or 0) <= 0 then
-        return { status = false, message = 'Loan already fully repaid.' }
+-- Opens the loan's installments, then pays the principal from the branch reserve
+-- into `accountId`. A failed payout cancels the installments again, so a loan is
+-- never disbursed without its debt or owed without its money.
+local function disburseWithInstallments(loan, accountId)
+    local opened = BankLoanContracts.OpenInstallments(loan, loanTotalDue(loan))
+    if not opened.ok then
+        print(('[bcc-banks] loan %s: installments not opened: %s %s'):format(tostring(loan.id),
+            tostring(opened.code), tostring(opened.message or '')))
+        BankLoanContracts.CancelInstallments(loan.id, 'banks.loan.open_failed')
+        return false
     end
-    if info and amount > info.outstanding then
-        amount = info.outstanding
+    if not DepositCash(accountId, tonumber(loan.amount) or 0, 'bank.loan.disbursement', loan.bank_id) then
+        BankLoanContracts.CancelInstallments(loan.id, 'banks.loan.disbursement_failed')
+        return false
     end
-    if not amount or amount <= 0 then
-        return { status = false, message = 'Invalid repayment amount.' }
-    end
-
-    -- Withdraw from account to repay the loan
-    local ok = WithdrawCash(account_id, amount, 'bank.loan.repayment',
-        info and info.loan and info.loan.bank_id)
-    if not ok then
-        return { status = false, message = 'Insufficient account funds.' }
-    end
-
-    -- Record the repayment against the loan
-    local repayDesc = _U and Feather.Locale.translateUpper('loan_repayment_account_desc') or 'Loan repayment from account'
-    AddLoanTransaction(loan_id, character_id, amount, 'loan - repayment', repayDesc)
-
-    -- Mark loan paid if fully repaid
-    local after = ComputeLoanOutstanding(loan_id)
-    if after and (after.outstanding or 0) <= 0 then
-        DB.exec('UPDATE `bcc_loans` SET `status` = "paid", `is_defaulted` = 0 WHERE `id` = ?', loan_id)
-        local ownerChar = (after.loan and after.loan.character_id) or (info and info.loan and info.loan.character_id) or character_id
-        if ownerChar then
-            SetOwnerAccountsFrozen(ownerChar, false)
-        end
-    end
-
-    return { status = true }
+    return true
 end
 
 -- Approve a loan: disburse funds and set status/approver metadata
@@ -149,7 +134,7 @@ function ApproveLoan(loan_id, approver_char_id)
     -- Disbursement: if account linked, deposit now; otherwise leave funds claimable.
     local amt = tonumber(loan.amount) or 0
     if loan.account_id then
-        local ok = DepositCash(loan.account_id, amt, 'bank.loan.disbursement', loan.bank_id)
+        local ok = disburseWithInstallments(loan, loan.account_id)
         if not ok then
             DB.exec(
                 'UPDATE `bcc_loans` SET `status` = \'pending\', `approved_by` = NULL, `approved_at` = NULL WHERE `id` = ? AND `disbursed_account_id` IS NULL',
@@ -202,7 +187,7 @@ function ClaimLoanToAccount(loan_id, account_id, character_id)
     end
 
     local amt = tonumber(loan.amount) or 0
-    local ok = DepositCash(account_id, amt, 'bank.loan.disbursement', loan.bank_id)
+    local ok = disburseWithInstallments(loan, account_id)
     if not ok then
         DB.exec(
             'UPDATE `bcc_loans` SET `disbursed_account_id` = NULL, `disbursed_at` = NULL WHERE `id` = ? AND `disbursed_account_id` = ?',

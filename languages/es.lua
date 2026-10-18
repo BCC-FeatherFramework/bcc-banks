@@ -525,4 +525,8 @@ Feather.Locale.register("es", {
     error_loan_operation_busy = "Este préstamo ya se está actualizando. Inténtalo de nuevo.",
     error_financial_operation_busy = "Hay otra operación financiera en curso. Inténtalo de nuevo.",
     error_unable_withdraw = "No se pudo completar el retiro.",
+    error_repay_below_installment = "La próxima cuota es de $%s; introduce al menos esa cantidad.",
+    loan_payment_pending = "Tu pago se está confirmando. Vuelve a revisar el préstamo en un momento.",
+    next_installment_label = "Próxima cuota",
+    installments_paid_label = "Cuotas pagadas",
 })
