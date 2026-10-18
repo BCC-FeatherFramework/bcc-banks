@@ -29,6 +29,7 @@ server_scripts {
    'server/feather/authority.lua',
    'server/feather/organizations.lua',
    'server/feather/smoke.lua',
+   'server/feather/acceptance.lua',
    'languages/*.lua',
    'server/api-loader.lua',
    'server/helpers/*.lua',

@@ -79,112 +79,18 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateSDB', function(params, cb, 
     end
     name = tostring(name):sub(1, 64)
 
-    -- resolve size & price from config (case-insensitive)
-    local sizes = Config.SafetyDepositBoxes.Sizes or {}
-    local resolvedKey, sz
-    do
-        local want = tostring(sizeKey):lower()
-        for k,v in pairs(sizes) do
-            if tostring(k):lower() == want then resolvedKey = k; sz = v; break end
-        end
-    end
-    if not sz then
-        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
-        return cb(false)
-    end
-
-    local CURRENCY = { cash = 0, gold = 1 }
-    local currencyId = CURRENCY[(payWith == 'gold') and 'gold' or 'cash']
-    local price = (payWith == 'gold') and (sz.GoldPrice or 0) or (sz.CashPrice or 0)
-    if not IsFinitePositiveNumber(price) then
-        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_data'), 'error', 4000)
-        return cb(false)
-    end
-
-    -- check balance using Feather character profile
-    local balance = (currencyId == 0) and tonumber(char.money) or tonumber(char.gold)
-    if not balance or balance < price then
-        if currencyId == 0 then
-            NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash', tostring(balance or 0)), 'error', 4000)
-        else
-            NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_gold_to_sell'), 'error', 4000)
-        end
-        return cb(false)
-    end
     if not AcquirePlayerFinancialLock(src) then
         NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         return cb(false)
     end
-
-    -- try to charge first so we don't create resources the player can't pay for
-    local charged = false
-    local chargeOk, chargeErr = pcall(function()
-        char.DebitWallet(currencyId, price, 'bank.box.fee', bank)
-        charged = true
-    end)
-    if not chargeOk then
+    local purchased = BankOps.PurchaseSDB(char, bank, name, sizeKey, payWith)
+    if not purchased.ok then
         ReleasePlayerFinancialLock(src)
-        devPrint("CreateSDB charge failed:", tostring(chargeErr))
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
+        devPrint("CreateSDB failed:", purchased.key)
+        NotifyClient(src, Feather.Locale.translateUpper(purchased.key, tostring(purchased.balance or 0)), 'error', 4000)
         return cb(false)
     end
-
-    -- create DB row
-    local ok, boxOrErr, szFromCtrl = pcall(CreateSDB, name, characterId, bank, resolvedKey)
-    if not ok or boxOrErr == false then
-        -- refund if DB failed
-        if charged then pcall(function() if char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund', bank) end end) end
-        devPrint("CreateSDB DB failed:", tostring(ok and (szFromCtrl or "unknown") or boxOrErr))
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
-        ReleasePlayerFinancialLock(src)
-        return cb(false)
-    end
-    local box = boxOrErr
-    local szCfg = szFromCtrl or sz
-
-    -- register inventory & grant access
-    local invName = tostring(name)
-    local restrictedItems  = (szCfg.BlacklistItems and #szCfg.BlacklistItems or 0) > 0 and szCfg.BlacklistItems or nil
-    local ignoreItemLimits = (szCfg.IgnoreItemLimit == true)
-
-    local invOk, invErr = pcall(function()
-        local inventory = exports['feather-inventory'].initiate()
-        local foreignKey = inventory.Inventory.RegisterForeignKey(
-            'bcc_safety_deposit_boxes',
-            'VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci', 'id')
-        if type(foreignKey) ~= 'table' or foreignKey.ok ~= true then
-            local failure = type(foreignKey) == 'table' and foreignKey.error or nil
-            error(failure and (failure.message or failure.code) or 'Feather Inventory foreign-key registration failed')
-        end
-        local registered = inventory.Inventory.RegisterInventory(
-            'bcc_safety_deposit_boxes', box.id, invName, ignoreItemLimits,
-            tonumber(szCfg.MaxWeight) or 100, restrictedItems, tostring(characterId), false,
-            tonumber(szCfg.MaxSlots)
-        )
-        if type(registered) ~= 'table' or registered.ok ~= true then
-            local failure = type(registered) == 'table' and registered.error or nil
-            error(failure and (failure.message or failure.code) or 'Feather Inventory container registration failed')
-        end
-
-        DB.exec('UPDATE `bcc_safety_deposit_boxes` SET `inventory_id`=? WHERE `id`=?', registered.value.uuid, box.id)
-        DB.exec(
-            'INSERT INTO `bcc_safety_deposit_boxes_access` (`safety_deposit_box_id`, `character_id`, `level`) VALUES (?,?,?)',
-            box.id, characterId, Config.AccessLevels.Admin
-        )
-    end)
-
-    if not invOk then
-        -- rollback + refund
-        pcall(function()
-            DB.exec('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', box.id)
-            DB.exec('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', box.id)
-            if charged and char.CreditWallet then char.CreditWallet(currencyId, price, 'bank.box.refund', bank) end
-        end)
-        devPrint("CreateSDB: inventory registration failed:", tostring(invErr))
-        NotifyClient(src, Feather.Locale.translateUpper('error_unable_create_sdb'), 'error', 4000)
-        ReleasePlayerFinancialLock(src)
-        return cb(false)
-    end
+    local box, price = purchased.box, purchased.price
 
     -- success (client will show its own toast)
     ReleasePlayerFinancialLock(src)
@@ -300,6 +206,26 @@ local function getSDBInventoryContentCounts(sdbId, inventoryId, displayName, siz
     end
 
     return invUuid, itemCount, weaponCount
+end
+
+-- Deletes box `sdbId` (its row from bcc_safety_deposit_boxes) when its Feather
+-- Inventory container is empty, with its access rows. The caller checks permission
+-- and proximity. Returns { ok, invId } or { ok = false, reason }.
+function DeleteEmptySDB(sdbId, row)
+    local _, invId = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
+    local deleted = exports['feather-inventory'].initiate().Inventory.DeleteContainerIfEmpty(
+        invId, 'bcc_safety_deposit_boxes', 'safety deposit box deleted')
+    if type(deleted) ~= 'table' or deleted.ok ~= true then
+        local reason = type(deleted) == 'table' and (deleted.message or deleted.code
+            or (deleted.error and deleted.error.code)) or 'invalid result'
+        devPrint('DeleteSDB: Feather Inventory refused deletion:', tostring(reason))
+        return { ok = false, reason = reason }
+    end
+    forgetSDBInventory(sdbId)
+    DB.exec('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', sdbId)
+    local affected = DB.exec('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', sdbId)
+    if not affected or affected < 1 then return { ok = false, reason = 'row_not_deleted' } end
+    return { ok = true, invId = invId }
 end
 
 exports['feather-core']:RegisterRPC('bcc-banks:OpenSDB', function(params, cb, src)
@@ -501,25 +427,13 @@ exports['feather-core']:RegisterRPC('bcc-banks:DeleteSDB', function(params, cb, 
         return
     end
 
-    local invUuid, invId = ensureSDBInventoryRegistered(sdbId, row.inventory_id, row.name, row.size)
     exports['feather-inventory'].initiate().Inventory.CloseInventory(src)
-    local deleted = exports['feather-inventory'].initiate().Inventory.DeleteContainerIfEmpty(
-        invId, 'bcc_safety_deposit_boxes', 'safety deposit box deleted')
-    if type(deleted) ~= 'table' or deleted.ok ~= true then
-        devPrint('DeleteSDB: Feather Inventory refused deletion:',
-            tostring(type(deleted) == 'table' and (deleted.message or deleted.code) or 'invalid result'))
+    local deleted = DeleteEmptySDB(sdbId, row)
+    if not deleted.ok then
         NotifyClient(src, Feather.Locale.translateUpper('failed_delete_sdb'), 'error', 4000)
         return cb(false)
     end
-    forgetSDBInventory(sdbId)
-
-    DB.exec('DELETE FROM `bcc_safety_deposit_boxes_access` WHERE `safety_deposit_box_id`=?', sdbId)
-    local affected = DB.exec('DELETE FROM `bcc_safety_deposit_boxes` WHERE `id`=?', sdbId)
-    if not affected or affected < 1 then
-        NotifyClient(src, Feather.Locale.translateUpper('failed_delete_sdb'), 'error', 4000)
-        cb(false)
-        return
-    end
+    local invId = deleted.invId
 
     local lines = {
         '**Action:** `Safety Deposit Box Deleted`',

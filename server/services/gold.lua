@@ -1,11 +1,4 @@
--- Server-side RPCs for Gold Exchange (buy/sell)
-
-local function getRates()
-    local cfg = Config and Config.GoldExchange or {}
-    local buy = tonumber(cfg.BuyPricePerGold) or 10.0 -- dollars per 1 gold
-    local sell = tonumber(cfg.SellPricePerGold) or 9.0 -- dollars per 1 gold
-    return buy, sell
-end
+-- Server-side RPCs for Gold Exchange (buy/sell). The money moves live in BankOps.
 
 -- The branch the player is exchanging at; its reserve pays and receives.
 local function goldExchangeBank(src)
@@ -19,8 +12,8 @@ local function roundTo(value, decimals)
 end
 
 exports['feather-core']:RegisterRPC('bcc-banks:GetGoldRates', function(params, cb, src)
-    if not canUseGoldExchange(src) then cb(false) return end
-    local buy, sell = getRates()
+    if not goldExchangeBank(src) then cb(false) return end
+    local buy, sell = BankOps.GoldRates()
     cb(true, { buy = buy, sell = sell })
 end)
 
@@ -52,53 +45,21 @@ exports['feather-core']:RegisterRPC('bcc-banks:BuyGold', function(params, cb, sr
         return
     end
 
-    local buyRate = select(1, getRates())
-
-    local gold = tonumber(params and params.gold)
-    local cash = tonumber(params and params.cash)
-
-    if (not IsFinitePositiveNumber(gold)) and (not IsFinitePositiveNumber(cash)) then
-        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_gold_or_cash_amount'), 'error', 4000)
-        cb(false)
-        return
-    end
-
-    if not gold and cash then
-        gold = cash / buyRate
-    end
-
-    gold = roundTo(gold or 0, 2)
-    if gold <= 0 then
-        NotifyClient(src, Feather.Locale.translateUpper('error_amount_zero'), 'error', 4000)
-        cb(false)
-        return
-    end
-
-    local cost = roundTo(gold * buyRate, 2)
-    local currentDollars = tonumber(char.money) or 0
-
-    devPrint('BuyGold: gold=', gold, 'cost=', cost, 'wallet=$', currentDollars)
-
-    if currentDollars < cost then
-        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_cash_purchase'), 'error', 4000)
-        cb(false)
-        return
-    end
-
     if not AcquirePlayerFinancialLock(src) then
         NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(0, cost, 'bank.gold.exchange', bankId) end)
-    local credited = removed and pcall(function() char.CreditWallet(1, gold, 'bank.gold.exchange', bankId) end)
-    if not credited then
-        if removed then pcall(function() char.CreditWallet(0, cost, 'bank.compensation', bankId) end) end
-        ReleasePlayerFinancialLock(src)
+    local bought = BankOps.BuyGold(char, bankId, params)
+    ReleasePlayerFinancialLock(src)
+    if not bought.ok then
+        if bought.key ~= 'error_unable_exchange_gold' then
+            NotifyClient(src, Feather.Locale.translateUpper(bought.key), 'error', 4000)
+        end
         cb(false)
         return
     end
-    ReleasePlayerFinancialLock(src)
+    local gold, cost, buyRate = bought.gold, bought.cost, bought.rate
 
     local lines = {
         '**Action:** `Buy Gold`',
@@ -141,53 +102,21 @@ exports['feather-core']:RegisterRPC('bcc-banks:SellGold', function(params, cb, s
         return
     end
 
-    local _, sellRate = getRates()
-
-    local gold = tonumber(params and params.gold)
-    local cash = tonumber(params and params.cash)
-
-    if (not IsFinitePositiveNumber(gold)) and (not IsFinitePositiveNumber(cash)) then
-        NotifyClient(src, Feather.Locale.translateUpper('error_invalid_gold_or_cash_amount'), 'error', 4000)
-        cb(false)
-        return
-    end
-
-    if not gold and cash then
-        gold = cash / sellRate
-    end
-
-    gold = roundTo(gold or 0, 2)
-    if gold <= 0 then
-        NotifyClient(src, Feather.Locale.translateUpper('error_amount_zero'), 'error', 4000)
-        cb(false)
-        return
-    end
-
-    local proceeds = roundTo(gold * sellRate, 2)
-    local currentGold = tonumber(char.gold) or 0
-
-    devPrint('SellGold: gold=', gold, 'proceeds=$', proceeds, 'wallet gold=', currentGold)
-
-    if currentGold < gold then
-        NotifyClient(src, Feather.Locale.translateUpper('error_not_enough_gold_to_sell'), 'error', 4000)
-        cb(false)
-        return
-    end
-
     if not AcquirePlayerFinancialLock(src) then
         NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         cb(false)
         return
     end
-    local removed = pcall(function() char.DebitWallet(1, gold, 'bank.gold.exchange', bankId) end)
-    local credited = removed and pcall(function() char.CreditWallet(0, proceeds, 'bank.gold.exchange', bankId) end)
-    if not credited then
-        if removed then pcall(function() char.CreditWallet(1, gold, 'bank.compensation', bankId) end) end
-        ReleasePlayerFinancialLock(src)
+    local sold = BankOps.SellGold(char, bankId, params)
+    ReleasePlayerFinancialLock(src)
+    if not sold.ok then
+        if sold.key ~= 'error_unable_exchange_gold' then
+            NotifyClient(src, Feather.Locale.translateUpper(sold.key), 'error', 4000)
+        end
         cb(false)
         return
     end
-    ReleasePlayerFinancialLock(src)
+    local gold, proceeds, sellRate = sold.gold, sold.cash, sold.rate
 
     local lines = {
         '**Action:** `Sell Gold`',

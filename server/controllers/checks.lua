@@ -274,28 +274,11 @@ exports['feather-core']:RegisterRPC('bcc-banks:CashCheck', function(params, cb, 
         cb(false)
         return
     end
-    local result = CashCheck(checkId, charId)
-
-    if not result.status then
-        ReleasePlayerFinancialLock(src)
-        local keyMap = {
-            already_cashed = 'error_check_already_cashed',
-            already_voided = 'error_check_voided',
-            not_yours      = 'error_check_not_yours',
-        }
-        local key = keyMap[result.message] or 'error_invalid_check'
-        NotifyClient(src, Feather.Locale.translateUpper(key), 'error', 4000)
-        cb(false)
-        return
-    end
-
     -- Paid from the reserve of the branch that holds the writer's account.
-    local issuingAccount = GetAccount(result.account_id)
-    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash',
-        issuingAccount and issuingAccount.bank_id) end)
-    if not credited then
-        DB.exec('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', checkId)
+    local result = BankOps.CashCheckToWallet(char, checkId)
+    if not result.ok then
         ReleasePlayerFinancialLock(src)
+        if result.key then NotifyClient(src, Feather.Locale.translateUpper(result.key), 'error', 4000) end
         cb(false)
         return
     end
@@ -419,27 +402,11 @@ if checkItemReady and Config.Checks and Config.Checks.Enabled == true and useIte
         NotifyClient(src, Feather.Locale.translateUpper('error_financial_operation_busy'), 'error', 4000)
         return
     end
-    local result = CashCheck(checkId, charId)
-
-    if not result.status then
-        ReleasePlayerFinancialLock(src)
-        local keyMap = {
-            already_cashed = 'error_check_already_cashed',
-            already_voided = 'error_check_voided',
-            not_yours      = 'error_check_not_yours',
-        }
-        local key = keyMap[result.message] or 'error_invalid_check'
-        NotifyClient(src, Feather.Locale.translateUpper(key), 'error', 4000)
-        return
-    end
-
     -- Paid from the reserve of the branch that holds the writer's account.
-    local issuingAccount = GetAccount(result.account_id)
-    local credited = pcall(function() char.CreditWallet(0, result.amount, 'bank.check.cash',
-        issuingAccount and issuingAccount.bank_id) end)
-    if not credited then
-        DB.exec('UPDATE `bcc_checks` SET `status` = "pending", `cashed_at` = NULL WHERE `id` = ? AND `status` = "cashed"', checkId)
+    local result = BankOps.CashCheckToWallet(char, checkId)
+    if not result.ok then
         ReleasePlayerFinancialLock(src)
+        if result.key then NotifyClient(src, Feather.Locale.translateUpper(result.key), 'error', 4000) end
         return
     end
 

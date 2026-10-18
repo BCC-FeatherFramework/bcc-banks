@@ -32,12 +32,39 @@ local function walletBalance(wallets, currency)
     return balance.ok and balance.value.postedAmount or 0
 end
 
+-- The identity of a character with no live session: console tests and other
+-- server-side work that names a character by UUID.
+function GetFeatherCharacterById(characterId)
+    if type(characterId) ~= 'string' or characterId == '' then return nil end
+    local provider = profileProvider()
+    if not provider or not provider.GetProfile then return nil end
+    local profile = provider.GetProfile(characterId)
+    if type(profile) ~= 'table' or profile.ok ~= true or type(profile.value) ~= 'table' then
+        return nil
+    end
+    return { characterId = profile.value.characterId or characterId, profile = profile.value }
+end
+
+local buildBankingContext
+
 function GetBankingContext(source)
     local identity = GetFeatherCharacter(source)
     if not identity then return nil end
+    return buildBankingContext(identity)
+end
+
+-- The same context for a character named by UUID, without a session (no source).
+function GetBankingContextForCharacter(characterId)
+    local identity = GetFeatherCharacterById(characterId)
+    if not identity then return nil end
+    return buildBankingContext(identity)
+end
+
+buildBankingContext = function(identity)
     local wallets = BanksEconomy.EnsureCharacterWallets({
         characterId = identity.characterId,
-        correlationId = ('banks:session:%s'):format(identity.sessionId)
+        correlationId = identity.sessionId and ('banks:session:%s'):format(identity.sessionId)
+            or ('banks:character:%s'):format(identity.characterId)
     })
     if not wallets.ok then return nil end
 

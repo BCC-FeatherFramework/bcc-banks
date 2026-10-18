@@ -967,17 +967,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:TransferCash', function(params, c
     end
 
     -- Calculate fee if cross-bank
-    local feePercent = 0.0
-    if not IdsEqual(fromAcc.bank_id, toAcc.bank_id) then
-        feePercent = tonumber(Config.Transfer.CrossBankFeePercent or 0.0) or 0.0
-    end
-
-    local function round2(n)
-        return math.floor((n + 0.0000001) * 100 + 0.5) / 100
-    end
-
-    local fee = round2((amount * feePercent) / 100.0)
-    local totalDebit = round2(amount + fee)
+    local fee, totalDebit, feePercent = BankOps.TransferFee(fromAcc, toAcc, amount)
     devPrint("Fee calc -> feePercent:", feePercent, "fee:", fee, "totalDebit:", totalDebit)
 
     -- Ensure sufficient funds (cash column)

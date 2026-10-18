@@ -99,6 +99,13 @@ function BankAuthority.IsAllowed(src)
         or type(session.value.characterId) ~= 'string' then
         return false, 'unauthenticated'
     end
+    return BankAuthority.IsAllowedForCharacter(session.value.characterId)
+end
+
+-- The same decision for a character named by UUID (console and tests).
+function BankAuthority.IsAllowedForCharacter(characterId)
+    if type(characterId) ~= 'string' or characterId == '' then return false, 'unauthenticated' end
+    local session = { value = { characterId = characterId } }
     -- Feather Admin staff: Admin grants its roles capabilities named
     -- staff.admin.<action>. A character holding one of the configured ones (by
     -- default one that only administrators and owners get) is allowed.
@@ -147,14 +154,22 @@ function BankAuthority.MatchingJob(characterId)
     return nil
 end
 
--- Assigns (roleWanted = true) or clears the bank admin role for a connected player.
+local UUID = '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$'
+
+-- Assigns (roleWanted = true) or clears the bank admin role. `target` is a
+-- connected player's server id or a character UUID (the character need not be online).
 local function replaceAssignment(target, roleWanted)
-    local session = exports['feather-core']:GetSessionContext(target)
-    if type(session) ~= 'table' or not session.ok or type(session.value) ~= 'table'
-        or type(session.value.characterId) ~= 'string' then
-        return false, 'Player ' .. tostring(target) .. ' has no active character.'
+    local characterId
+    if type(target) == 'string' and target:match(UUID) then
+        characterId = target:lower()
+    else
+        local session = exports['feather-core']:GetSessionContext(tonumber(target))
+        if type(session) ~= 'table' or not session.ok or type(session.value) ~= 'table'
+            or type(session.value.characterId) ~= 'string' then
+            return false, 'Player ' .. tostring(target) .. ' has no active character.'
+        end
+        characterId = session.value.characterId
     end
-    local characterId = session.value.characterId
     local request = {
         requestId = ('bcc-banks:%s:%s:%d:%d'):format(roleWanted and 'assign' or 'clear',
             characterId, os.time(), GetGameTimer() % 100000),
@@ -176,10 +191,12 @@ local function replaceAssignment(target, roleWanted)
     return true, characterId
 end
 
+BankAuthority.ReplaceAssignment = replaceAssignment
+
 RegisterCommand('BccBanksAdminGrant', function(source, args)
     if source ~= 0 then return end
-    local target = tonumber(args[1])
-    if not target then return print('[bcc-banks] Usage: BccBanksAdminGrant <server id>') end
+    local target = tonumber(args[1]) or args[1]
+    if not target then return print('[bcc-banks] Usage: BccBanksAdminGrant <server id|character uuid>') end
     local ok, detail = replaceAssignment(target, true)
     print(ok and ('[bcc-banks] Bank admin granted to character %s'):format(detail)
         or ('[bcc-banks] Bank admin grant failed: %s'):format(detail))
@@ -187,8 +204,8 @@ end, true)
 
 RegisterCommand('BccBanksAdminRevoke', function(source, args)
     if source ~= 0 then return end
-    local target = tonumber(args[1])
-    if not target then return print('[bcc-banks] Usage: BccBanksAdminRevoke <server id>') end
+    local target = tonumber(args[1]) or args[1]
+    if not target then return print('[bcc-banks] Usage: BccBanksAdminRevoke <server id|character uuid>') end
     local ok, detail = replaceAssignment(target, false)
     print(ok and ('[bcc-banks] Bank admin removed from character %s'):format(detail)
         or ('[bcc-banks] Bank admin removal failed: %s'):format(detail))
