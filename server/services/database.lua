@@ -180,6 +180,18 @@ CreateThread(function()
         DB.exec('ALTER TABLE `bcc_loans_payments` ADD UNIQUE KEY `uq_lp_loan_seq` (`loan_id`, `seq`)')
     end
 
+    -- feather-audit producer outbox (server/helpers/audit.lua), as feather-admin's.
+    DB.exec([[
+        CREATE TABLE IF NOT EXISTS `bcc_banks_audit_outbox` (
+            `event_id` VARCHAR(128) NOT NULL PRIMARY KEY, `payload` MEDIUMTEXT NOT NULL,
+            `state` VARCHAR(16) NOT NULL DEFAULT 'pending', `attempt_count` INT UNSIGNED NOT NULL DEFAULT 0,
+            `next_attempt` BIGINT NOT NULL DEFAULT 0, `lease_owner` CHAR(36) NULL, `lease_until` BIGINT NULL,
+            `audit_event_id` CHAR(36) NULL, `last_code` VARCHAR(128) NULL,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, `delivered_at` TIMESTAMP NULL,
+            INDEX `idx_bank_audit_retry` (`state`, `next_attempt`), INDEX `idx_bank_audit_lease` (`state`, `lease_until`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+    ]])
+
     -- bcc_loan_interest_rates (no FKs)
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcc_loan_interest_rates` (

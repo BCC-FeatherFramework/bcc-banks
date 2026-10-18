@@ -306,6 +306,31 @@ local function run(characterA, characterB, bankArg)
     local job = BankAuthority.MatchingJob(characterB)
     print(('%s 10 admin: banker job for B: %s'):format(TAG, job or 'none (assign one in feather-jobs to try it)'))
 
+    -- D. Audit: an event goes through the outbox into feather-audit, and a replay is a duplicate.
+    if GetResourceState('feather-audit') == 'started' then
+        local lines = { '**Action:** `Acceptance Fixture`', '**Bank:** `' .. tostring(bank.name) .. '`' }
+        lines.actor = { characterId = characterA, name = 'Acceptance' }
+        local eventId = QueueBankAuditLog('Acceptance Audit Fixture', lines)
+        local queued = eventId and DB.one('SELECT `state`, `payload` FROM `bcc_banks_audit_outbox` WHERE `event_id` = ?', eventId)
+        check('D audit: event written to the outbox', queued ~= nil and queued.state == 'pending', eventId)
+        local delivered
+        for _ = 1, 5 do
+            BankAudit.PublishOnce()
+            delivered = eventId and DB.one([[SELECT `state`, `audit_event_id`, `last_code` FROM `bcc_banks_audit_outbox`
+                WHERE `event_id` = ?]], eventId)
+            if delivered and delivered.state ~= 'pending' and delivered.state ~= 'leased' then break end
+            Wait(500)
+        end
+        check('D audit: delivered to feather-audit', delivered and delivered.state == 'delivered'
+            and delivered.audit_event_id ~= nil, delivered and (delivered.state .. ' ' .. tostring(delivered.last_code)))
+        local replay = queued and exports['feather-audit']:Ingest(json.decode(queued.payload))
+        check('D audit: a replay is a duplicate, not a second record', type(replay) == 'table'
+            and replay.result == 'duplicate' and replay.auditEventId == (delivered and delivered.audit_event_id),
+            type(replay) == 'table' and replay.result or nil)
+    else
+        skip('D audit', 'feather-audit is not started')
+    end
+
     -- Clean up: sell back the gold kept for the account test, close the test accounts.
     local _, _, leftover = wallet(characterA)
     if leftover > goldA + 0.004 then BankOps.SellGold(wallet(characterA), bank.id, { gold = leftover - goldA }) end

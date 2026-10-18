@@ -133,6 +133,9 @@ Config = {
 	-- of N months owes amount + interest in N equal installments, one due every
 	-- SecondsPerMonth real seconds after approval. An installment still unpaid
 	-- DefaultAfterSeconds after its due date defaults and freezes the borrower's accounts.
+	-- feather-audit producer: sourceInstance must equal feather-audit's Config.SourceInstance.
+	Audit = { sourceInstance = 'default', batchSize = 25, pollMilliseconds = 5000 },
+
 	LoanContracts = {
 		SecondsPerMonth     = 86400, -- one loan month in real seconds (86400 = 1 real day)
 		DefaultAfterSeconds = 86400, -- grace after an installment's due date before it defaults
