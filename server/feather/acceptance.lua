@@ -348,6 +348,16 @@ local function runBox(characterA, boxId)
     local raw = GetResourceKvpString(BOX_KVP .. boxId)
     local saved = raw and json.decode(raw) or nil
     local row = DB.one('SELECT `id`,`name`,`size`,`inventory_id` FROM `bcc_safety_deposit_boxes` WHERE `id` = ?', boxId)
+    if not row and saved and IdsEqual(saved.owner, characterA) then
+        -- Deleted through the box menu before this ran: only the test refund is left.
+        local refunded = pcall(function()
+            GetBankingContextForCharacter(characterA).CreditWallet(saved.payWith == 'gold' and 1 or 0, saved.price, 'bank.box.refund', saved.bank)
+        end)
+        check('7 box: deleted in game; test price refunded', refunded,
+            (saved.payWith == 'gold' and '' or '$') .. money(saved.price) .. ' ' .. saved.payWith)
+        if refunded then DeleteResourceKvp(BOX_KVP .. boxId) end
+        return
+    end
     if not check('7 box: box exists and A owns it', row ~= nil and IsSDBOwner(boxId, characterA)) then return end
     local inventoryId = tonumber(DB.value('SELECT `id` FROM `inventory` WHERE `uuid` = ?', row.inventory_id))
     local inventory = exports['feather-inventory'].initiate()
