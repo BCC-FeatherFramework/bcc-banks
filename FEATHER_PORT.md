@@ -1,6 +1,11 @@
 # BCC Banks Feather port
 
-Status: 2.0.0, Feather port on the Feather Economy ledger. `BanksReleaseSmokeTest` is the read-only release check. Live acceptance (accounts, deposits, transfers, loans, checks, boxes, gold, restart) is still to run on the development server. The one-time balance migration is not needed on this server: no temporary-economy data exists.
+Status: 3.0.0, Feather port on the Feather Economy ledger, with loans owed through
+feather-contracts and bank actions recorded in feather-audit. `BanksReleaseSmokeTest` is the
+read-only release check; `BanksAcceptanceTest` runs the live acceptance with nobody connected
+(48 passed, 0 failed on the development server, 18 October 2026). Still to check in game:
+restarting bcc-banks in the middle of a menu (live acceptance item 9). The one-time balance
+migration is not needed on this server: no temporary-economy data exists.
 
 The player-facing menus, branches, NPCs, prompts, translations, checks, loans,
 gold exchange, and safety-deposit gameplay remain BCC Banks responsibilities.
@@ -62,8 +67,9 @@ Allowed, in order:
 - On start (and whenever feather-authority restarts) `server/feather/authority.lua` registers the bcc-banks-owned
   capability `staff.banks.manage`, creates the staff role `staff.banks.admin`, and grants the capability to it.
   All steps are idempotent.
-- `BccBanksAdminGrant <server id>` / `BccBanksAdminRevoke <server id>` (console only) assign or clear that role for
-  the player's active character through `ReplaceOwnedStaffAssignment`, which only touches roles bcc-banks owns.
+- `BccBanksAdminGrant <server id|character uuid>` / `BccBanksAdminRevoke <server id|character uuid>` (console only)
+  assign or clear that role through `ReplaceOwnedStaffAssignment`, which only touches roles bcc-banks owns. A character
+  UUID works while the character is offline. `BankAuthority.IsAllowedForCharacter` makes the same decision by UUID.
 - This needs `bcc-banks` in every `Config.Access` trust list of `feather-authority/config.lua` (reader, capability
   registrar, role creator, grantor, assigner). Authority's grantor/assigner trust is not limited to owned roles, so
   bank-specific console commands remain restricted to bank-owned roles. Old account assignments are not used; grant the role again for the desired character. Revoking a bank-specific assignment does not remove access granted by an accepted Feather Admin role.
@@ -79,10 +85,11 @@ Bank products move money between customers and their branch reserve with ordinar
 
 | Product | Into reserve | Out of reserve |
 |---|---|---|
-| Loans | `bank.loan.repayment` (account or wallet) | `bank.loan.disbursement` |
+| Loans | installments settled by feather-contracts (`contracts.settlement`, see Loans) | `bank.loan.disbursement` |
 | Checks | `bank.check.issue` (writer's account) | `bank.check.cash` (from the writer's branch), void refund |
 | Safety-deposit boxes | `bank.box.fee` | `bank.box.refund` |
 | Gold exchange (branch the player stands at) | `bank.gold.exchange` | `bank.gold.exchange` |
+| Staff (Branch Reserve page) | `bank.reserve.deposit` (own wallet) | `bank.reserve.withdraw` (own wallet) |
 | Rollbacks | | `bank.compensation` |
 
 Economy accepts these reasons only against a treasury bound to the calling resource, so bcc-banks cannot touch a shop or
@@ -95,6 +102,62 @@ BccBanksReserveFund <bank id> <dollars|gold> <amount> create funds in a branch r
 
 Trust entries this needs: `bcc-banks` in feather-organizations `trustedCreators`/`trustedMutators`/`trustedReaders`,
 and `Config.servicePolicy['feather-organizations']['bcc-banks']` (create, update) in feather-admin.
+
+### Branch Reserve page
+
+`/bankadmin` → a branch → **Branch Reserve** shows the reserve's dollar and gold balance and its last ten movements,
+and moves money between the reserve and the staff member's own wallet with a required reason (audit event and
+character transaction history). `BankAuthority.CanManageReserve` decides who may: bank administrators (Admin staff or
+the bank role) manage every branch; a banker job holder only the branch whose organization is the job's employer
+(`employerType = 'organization'`, `employerId` = the branch organization in feather-jobs). The Economy reasons are
+limited to one direction each: `bank.reserve.deposit` (`actor_wallet_to_operated`) and `bank.reserve.withdraw`
+(`operated_to_wallet`). `BankReserve.Status` / `Move` (`server/services/reserve.lua`) are shared with the test.
+
+## Loans (feather-contracts)
+
+An approved loan's amount plus interest is owed in equal installments, one feather-contracts obligation each
+(type `bank_loan_installment`, owned by bcc-banks): debtor the borrower, creditor the branch organization, issuer the
+system. Settling an installment pays the borrower's wallet into the branch reserve (the organization's treasury).
+`server/feather/contracts.lua` is the boundary.
+
+- A loan of N months has N installments; installment k falls due k × `Config.LoanContracts.SecondsPerMonth` real
+  seconds after approval (default one day), the last one absorbing the rounding. An installment still unpaid
+  `DefaultAfterSeconds` after its due date defaults (Contracts does this).
+- Approval (or a claim, for a loan approved without an account) opens the installments first and pays the
+  principal second; a failed payout cancels them. Request IDs derive from the loan and the installment number, so a
+  repeated approval never opens a second debt.
+- Repay pays whole installments, oldest first, from the wallet as the player (`actorSource`); an amount below the
+  next installment is refused with that installment's amount. There are no part payments.
+- Contracts' `due`, `defaulted` and `settled` events, plus a one-minute sync for events missed while bcc-banks was
+  stopped, send the reminder or default mail (`Config.LoanTiming.DailyReminders`), freeze the borrower's accounts on a
+  default, and mark the loan paid (unfreezing when no other loan is defaulted) once every installment is settled.
+- Installments are rows of `bcc_loans_payments` (`seq`, `obligation_id`, `status`, `paid_at`). An account or a staff
+  deletion is refused while the account has an open loan, because deleting it cascades to the loan.
+
+Trust entries: `bcc-banks` in feather-contracts `Config.Access.trustedIssuers`, and
+`Config.servicePolicy['feather-contracts']['bcc-banks']` (`contracts.obligation.issue`, `contracts.obligation.cancel`)
+in feather-admin.
+
+## Audit (feather-audit)
+
+Every bank action records one `bank.action.recorded` event (version 1, schema `schemas/banks/action_recorded_v1.lua`
+in feather-audit): the action as a snake-case key, a bounded summary of its facts (restricted), and the acting
+character. `server/helpers/audit.lua` writes it to `bcc_banks_audit_outbox`; a publisher leases batches every
+`Config.Audit.pollMilliseconds`, calls `Ingest`, and marks each row delivered (accepted or duplicate), retried with
+backoff, or quarantined (kept for operators). This is feather-admin's producer pattern. `BanksAuditOutboxStatus`
+prints the outbox by state. `Config.Audit.sourceInstance` must equal feather-audit's `Config.SourceInstance`.
+
+Recorded actions: accounts created, closed, deleted by staff, frozen and unfrozen; account and box access granted and
+removed; cash and gold deposits and withdrawals; transfers; checks written, cashed and voided; loan applications,
+approvals, rejections, claims and repayments; boxes created, deleted and opened by staff; gold bought, sold and
+exchanged from bars; branch reserve deposits and withdrawals; branches created; interest rates and opening hours set.
+
+Known limit: the event is written right after the action, not in the same database transaction. Most bank actions
+are feather-economy transfers, which bcc-banks cannot join, so a crash between the two can lose that one event.
+Economy's own journal remains the authoritative record of every money movement.
+
+Trust entries: `Config.Producers['bcc-banks']` in feather-audit (`eventPrefixes = { 'bank.action.' }`) and the schema
+file in its manifest.
 
 ## One-time migration from the temporary economy
 
@@ -120,24 +183,35 @@ balance. Until it has run, accounts show no balance and money operations fail cl
 | feather-organizations `config.lua` | `trustedCreators`, `trustedMutators`, `trustedReaders` |
 | feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` |
 | feather-jobs `config.lua` | `trustedReaders` (bank administration by job) |
-| feather-admin `configs/service_policy.lua` | `['feather-organizations']['bcc-banks']` create/update; `['feather-economy']['bcc-banks']['economy.currency.issue']` |
+| feather-contracts `config.lua` | `Config.Access.trustedIssuers` |
+| feather-audit `config.lua` | `Config.Producers['bcc-banks']` (`bank.action.`), schema `schemas/banks/action_recorded_v1.lua` |
+| feather-admin `configs/service_policy.lua` | `['feather-organizations']['bcc-banks']` create/update; `['feather-economy']['bcc-banks']['economy.currency.issue']`; `['feather-contracts']['bcc-banks']` obligation issue/cancel |
 
-## Live acceptance (to run)
+## Live acceptance
 
-1. `BanksReleaseSmokeTest`: every line PASS.
-2. `BccBanksReserveFund <bank id> dollars 5000` and `gold 100`; `BccBanksReserveStatus` shows them.
-3. Open an account, deposit, withdraw, transfer to a second account (cross-bank fee to the sink).
-4. Share the account with a second player at each access level.
-5. Loan: apply, approve in `/bankadmin`, claim, repay; the reserve goes down then up.
-6. Check: write, cash (second player), and void one.
-7. Safety-deposit box: buy, store items, restart, items still there; delete.
-8. Gold exchange both ways at a branch.
-9. Restart bcc-banks in the middle of a menu: no duplicate teller, no money lost.
-10. Admin access: an Admin administrator, a granted bank role, and (with a `banker` job) a job holder.
+`BanksAcceptanceTest <character A> <character B> [bank id]` (server console) runs items 2 to 8 and 10 with characters
+named by UUID, through the same `BankOps` functions and controllers as the menus, then closes its test accounts. It
+prints a second command, `BanksAcceptanceTest box <A> <box id>`, to run after a restart: it checks the stored item
+survived, empties and deletes the box and refunds it. A needs the cheapest box price plus about $55; B gains $1.00.
+
+| # | Check | Result (18 October 2026) |
+|---|---|---|
+| 1 | `BanksReleaseSmokeTest`: every line PASS | run before release (fails "development disabled" while `devMode` is on) |
+| 2 | Reserve funding and status | PASS |
+| 3 | Account: open, deposit, withdraw, frozen, gold, cross-branch transfer with fee | PASS |
+| 4 | Sharing at every access level | PASS |
+| 5 | Loan: apply, approve, installments in Contracts, repay, reserve down then up | PASS |
+| 6 | Check: write, cash by the recipient, void | PASS |
+| 7 | Box: buy, store, restart, item still there, delete | PASS |
+| 8 | Gold exchange both ways | PASS |
+| 9 | Restart bcc-banks in the middle of a menu: no duplicate teller, no money lost | in game, pending |
+| 10 | Admin access by role; branch reserve by role; job holder reported | PASS (job holder needs a `banker` assignment) |
+| | Branch Reserve page; audit delivery and duplicate replay | PASS |
+
+Offline specs (Lua 5.4, no server): `tests/loan_installments_spec.lua` (from the resource folder),
+`tests/audit_event_spec.lua` and `tests/chat_suggestion_spec.lua` (from the resources folder).
 
 ## Remaining work
 
-1. Live acceptance above.
-2. Let bank staff manage their branch reserve in game; move loan obligations to feather-contracts.
-3. Vendor the Audit producer kit, validate pending facts, and enable delivery.
-4. Revalidate the menu adapter when Feather Menu v2 moves beyond `2.0.0-alpha.4`.
+1. Live acceptance item 9 in game.
+2. Feather Menu v2 is checked up to `2.0.0-alpha.8` (alpha.5 to alpha.8 only added elements); recheck when it leaves alpha.

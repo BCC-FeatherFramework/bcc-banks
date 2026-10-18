@@ -33,6 +33,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:CreateBank', function(params, res
         return
     end
     NotifyClient(src, 'Bank created: ' .. name, 'success', 3000)
+    BankAuditStaff(src, 'Bank Branch Created', { { 'Bank', name }, { 'Bank ID', bankId } })
     res(true)
     -- Give the new branch its organization and reserve.
     local provisioned = BankOrganizations.Ensure({ id = bankId, name = name })

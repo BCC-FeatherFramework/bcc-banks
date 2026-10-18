@@ -208,6 +208,16 @@ CreateThread(function()
     end
 end)
 
+-- A staff action as an audit event: `facts` is a list of { label, value }.
+function BankAuditStaff(src, title, facts)
+    local lines = {}
+    for _, fact in ipairs(facts or {}) do
+        lines[#lines + 1] = ('**%s:** `%s`'):format(tostring(fact[1]), tostring(fact[2]))
+    end
+    appendActorLines(lines, src)
+    return QueueBankAuditLog(title, lines)
+end
+
 -- Console: BanksAuditOutboxStatus
 RegisterCommand('BanksAuditOutboxStatus', function(source)
     if source ~= 0 then return end

@@ -217,6 +217,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetBankRate', function(para
         return
     end
     DB.exec('INSERT INTO `bcc_bank_interest_rates` (bank_id, interest) VALUES (?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', bankId, rate)
+    BankAuditStaff(src, 'Bank Interest Rate Set', { { 'Bank', BccBanksInternal.getBankName(bankId) }, { 'Rate', rate } })
     cb(true)
 end)
 
@@ -269,6 +270,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetCharRate', function(para
     else
         DB.exec('INSERT INTO `bcc_loan_interest_rates` (character_id, bank_id, interest) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interest = VALUES(interest)', charId, bankId, rate)
     end
+    BankAuditStaff(src, 'Character Interest Rate Set', { { 'Character', charId }, { 'Bank', bankId or 'all' }, { 'Rate', rate } })
     cb(true)
 end)
 
@@ -293,6 +295,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:ClearCharRate', function(pa
     else
         DB.exec('DELETE FROM `bcc_loan_interest_rates` WHERE character_id = ? AND bank_id = ?', charId, bankId)
     end
+    BankAuditStaff(src, 'Character Interest Rate Cleared', { { 'Character', charId }, { 'Bank', bankId or 'all' } })
     cb(true)
 end)
 
@@ -448,6 +451,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:UnfreezeAccount', function(
     else
         DB.exec('UPDATE `bcc_accounts` SET `is_frozen` = 0 WHERE `id` = ?', accId)
     end
+    BankAuditStaff(src, 'Bank Accounts Unfrozen', { { 'Account', accId }, { 'Owner', ownerId or 'unknown' } })
 
     cb(true)
 end)
@@ -477,6 +481,7 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:SetAccountFrozen', function
     end
 
     DB.exec('UPDATE `bcc_accounts` SET `is_frozen` = ? WHERE `id` = ?', shouldFreeze and 1 or 0, accId)
+    BankAuditStaff(src, shouldFreeze and 'Bank Account Frozen' or 'Bank Account Unfrozen', { { 'Account', accId } })
     cb(true, { is_frozen = shouldFreeze })
 end)
 
@@ -515,12 +520,22 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:DeleteAccount', function(pa
         return
     end
 
+    -- Deleting the account cascades to its loans; an open loan keeps the account.
+    local openLoans = DB.value([[SELECT COUNT(*) FROM `bcc_loans` WHERE `account_id` = ?
+        AND `status` IN ('pending', 'approved', 'defaulted')]], accId)
+    if (tonumber(openLoans) or 0) > 0 then
+        NotifyClient(src, 'Unable to delete. The account has an open loan.', 'error', 4000)
+        cb(false)
+        return
+    end
+
     devPrint('[ADMIN] DeleteAccount removing account', accId, 'owner=', row.owner_id, 'cash=', row.cash, 'gold=', row.gold)
     DB.exec('DELETE FROM `bcc_accounts_access` WHERE `account_id` = ?', accId)
     DB.exec('DELETE FROM `bcc_transactions` WHERE `account_id` = ?', accId)
     DB.exec('DELETE FROM `bcc_accounts` WHERE `id` = ?', accId)
 
     devPrint('[ADMIN] DeleteAccount success for', accId)
+    BankAuditStaff(src, 'Bank Account Deleted', { { 'Account', accId }, { 'Name', row.name }, { 'Owner', row.owner_id } })
     cb(true)
 end)
 

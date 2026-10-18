@@ -335,6 +335,8 @@ exports['feather-core']:RegisterRPC('bcc-banks:Admin:OpenSDB', function(params, 
     if type(temporary) ~= 'table' or temporary.ok ~= true then return cb(false) end
     local opened = exports['feather-inventory'].initiate().Inventory.OpenInventory(src, invUuid, 'safety_deposit_box_admin')
     if type(opened) ~= 'table' or opened.ok ~= true then return cb(false) end
+    -- Privileged inspection of a customer's box.
+    BankAuditStaff(src, 'Safety Deposit Box Opened By Staff', { { 'SDB ID', sdbId }, { 'SDB Name', row.name } })
     cb(true)
 end)
 
